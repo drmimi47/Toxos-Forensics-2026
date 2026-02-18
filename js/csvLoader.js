@@ -1,0 +1,136 @@
+/**
+ * csvLoader.js – Fetches a CSV file, parses it, and creates sprite-based
+ * point markers that maintain a constant screen size regardless of zoom.
+ *
+ * Expects CSV columns: X, Y  (EPSG:2263 US survey feet)
+ * Optional columns used for tooltips: EntityHandle, Text, Layer
+ */
+import * as THREE from 'three';
+import CONFIG from '../config/config.js';
+
+/**
+ * Parse a simple CSV string into an array of objects.
+ * Handles quoted fields.
+ */
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const row = {};
+    headers.forEach((h, idx) => {
+      row[h] = values[idx] ?? '';
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * Create a circular dot texture via a canvas.
+ * @param {number} color  hex color (e.g. 0xff0000)
+ * @param {number} [size=64]  canvas pixel size
+ * @returns {THREE.CanvasTexture}
+ */
+function createDotTexture(color, size = 64) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const hex = '#' + new THREE.Color(color).getHexString();
+  const half = size / 2;
+  const radius = half * 0.72;
+
+  // Solid filled circle (no outline)
+  ctx.beginPath();
+  ctx.arc(half, half, radius, 0, Math.PI * 2);
+  ctx.fillStyle = hex;
+  ctx.fill();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Convert an EPSG:2263 (X, Y) pair (US survey feet) into the Three.js
+ * scene coordinate system (metres, Y-up, origin-offset applied).
+ */
+function toSceneCoords(xEpsg, yEpsg) {
+  const ft2m = CONFIG.feetToMeters;
+  const off  = CONFIG.originOffset;
+
+  return new THREE.Vector3(
+    xEpsg * ft2m - off.x,
+    CONFIG.marker.heightOffset - off.y,
+    -(yEpsg * ft2m) - off.z
+  );
+}
+
+/**
+ * Load a CSV file and add sprite markers to the scene.
+ * Sprites use sizeAttenuation=true with dynamic scale adjustment for constant screen size.
+ */
+export async function loadCSVPoints(scene, csvPath, color, label) {
+  const response = await fetch(csvPath);
+  const text = await response.text();
+  const rows = parseCSV(text);
+
+  const dotMap = createDotTexture(color);
+
+  const material = new THREE.SpriteMaterial({
+    map: dotMap,
+    sizeAttenuation: true,    // world-unit sizing; we dynamically adjust scale for constant screen size
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending
+  });
+
+  const group = new THREE.Group();
+  group.name = label;
+
+  const markerSize = CONFIG.marker.worldSize;
+
+  rows.forEach((row) => {
+    const x = parseFloat(row.X);
+    const y = parseFloat(row.Y);
+    if (Number.isNaN(x) || Number.isNaN(y)) return;
+
+    const pos = toSceneCoords(x, y);
+    const sprite = new THREE.Sprite(material.clone());
+    sprite.position.copy(pos);
+
+    sprite.scale.set(markerSize, markerSize, 1);
+
+    // Attach metadata for raycasting / tooltips
+    sprite.userData = {
+      type: label,
+      handle: row.EntityHandle || '',
+      text: row.Text || '',
+      coordX: x,
+      coordY: y
+    };
+
+    group.add(sprite);
+  });
+
+  scene.add(group);
+  console.log(`[csvLoader] ${label}: ${group.children.length} points loaded from ${csvPath}`);
+  return { group, rows };
+}
+
+/**
+ * Convenience: load all CSV datasets defined in CONFIG.
+ */
+export async function loadAllCSV(scene) {
+  const results = {};
+  for (const [key, cfg] of Object.entries(CONFIG.csvFiles)) {
+    results[key] = await loadCSVPoints(scene, cfg.path, cfg.color, cfg.label);
+  }
+  return results;
+}

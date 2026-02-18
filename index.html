@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0f0b" />
+  <title>Toxos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="./css/threejs.css" />
+</head>
+<body>
+
+  <!-- Preloader -->
+  <div class="preloader">
+    <div class="preloader-wrapper">
+      <div class="preloader-content">
+        <div class="preloader-brand">TOXOS</div>
+        <div class="preloader-bar-track">
+          <div class="preloader-bar-fill" id="preloader-bar"></div>
+        </div>
+        <p class="preloader-text" id="preloader-text">Initialising…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js canvas container -->
+  <div id="viewer-container"></div>
+
+  <!-- Header -->
+  <header id="header">
+    <div class="header-brand">
+      <span class="brand-mark">TOXOS</span>
+      <span class="brand-sub"></span>
+    </div>
+  </header>
+
+  <!-- Legend overlay -->
+  <div id="legend">
+    <div class="legend-title">Legend</div>
+    <div class="legend-item">
+      <span class="legend-dot cso"></span>
+      <span class="legend-label">Combined Sewer Overflow (CSO)</span>
+      <span class="legend-count" id="count-cso">—</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot npdes"></span>
+      <span class="legend-label">Water National Pollutant Discharge Elimination Systems (NPDES)</span>
+      <span class="legend-count" id="count-npdes">—</span>
+    </div>
+  </div>
+
+  <!-- Tooltip for hover info -->
+  <div id="tooltip" class="hidden"></div>
+
+  <!-- Detail panel (dataset sub-page, slides in on data-point click) -->
+  <div id="detail-panel" class="detail-panel hidden">
+    <button id="detail-back" class="detail-back" aria-label="Back to map">&larr; Back</button>
+    <div class="detail-content">
+      <h1 id="detail-title" class="detail-title"></h1>
+      <p id="detail-body" class="detail-body"></p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <div class="footer-controls">
+      <p class="controls-mouse">
+        <span class="key">LMB</span> Rotate&ensp;
+        <span class="key">RMB</span> Pan&ensp;
+        <span class="key">Scroll</span> Zoom&ensp;
+        <span class="key">DblClick</span> Top View
+      </p>
+      <p class="controls-touch">
+        1-finger drag: Rotate &ensp; 2-finger drag: Pan &ensp; Pinch: Zoom &ensp; Double-tap: Top View
+      </p>
+    </div>
+    <div class="footer-meta">
+      <span>EPSG:2263 · NY State Plane</span>
+    </div>
+  </footer>
+
+  <!-- Entry point -->
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
