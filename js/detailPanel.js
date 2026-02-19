@@ -33,6 +33,26 @@ const DATASET_CONTENT = {
            Nullam vehicula dui eu libero euismod, vel commodo nisi bibendum.
            Aliquam erat volutpat. Suspendisse potenti. Nam malesuada risus nec
            facilisis hendrerit. Vivamus in urna a turpis vestibulum iaculis.`
+  },
+  RCRA: {
+    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
+    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum erat, nec dictum urna erat nec erat.`,
+    image: './assets/images/rcra.jpg'
+  },
+  'Regulated Hazardous Waste Management Facilities (RCRA)': {
+    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
+    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum erat, nec dictum urna erat nec erat.`,
+    image: './assets/images/rcra.jpg'
+  },
+  RCRA_2263_CLIPPED: {
+    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
+    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum erat, nec dictum urna erat nec erat.`,
+    image: './assets/images/rcra.jpg'
+  },
+  rcra_2263_clipped: {
+    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
+    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum urna erat nec erat.`,
+    image: './assets/images/rcra.jpg'
   }
 };
 

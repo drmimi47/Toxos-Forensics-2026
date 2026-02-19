@@ -109,9 +109,16 @@ export function setupTooltips(camera, scene, tooltipEl) {
         animating.add(hoveredSprite);                     // grow new
       }
 
-      // Image path keyed by dataset type
-      const imgMap = { CSO: './assets/images/cso.jpg', NPDES: './assets/images/npdes.jpg' };
-      const imgSrc = imgMap[d.type] || '';
+
+      // Normalize for RCRA purple points: match on group name or type containing 'RCRA'
+      let imgSrc = '';
+      if (/rcra/i.test(d.type) || /rcra/i.test(hit.object.parent?.name)) {
+        imgSrc = './assets/images/rcra.jpg';
+      } else if (/cso/i.test(d.type)) {
+        imgSrc = './assets/images/cso.jpg';
+      } else if (/npdes/i.test(d.type)) {
+        imgSrc = './assets/images/npdes.jpg';
+      }
 
       tooltipEl.innerHTML = [
         `<strong>${d.type}</strong>`,

@@ -50,7 +50,7 @@ const CONFIG = {
   marker: {
     screenSize: 0.008,   // sprite scale when sizeAttenuation=false (perspective)
     worldSize: 80,       // sprite scale in world units for ortho camera
-    heightOffset: 15     // lift markers slightly above terrain (metres)
+    heightOffset: 3     // lift markers slightly above terrain (metres)
   },
 
   /* ---- Camera defaults (metres) ---- */

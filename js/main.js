@@ -78,7 +78,35 @@ async function init() {
       if (el) el.textContent = csvResults.rcra_2263_clipped.group.children.length;
     }
 
+
     setProgress(95, 'Preparing interactions…');
+
+    // --- Legend click interaction to toggle dataset visibility ---
+    // Map legend dot class to csvResults key
+    const legendMap = {
+      cso: 'cso',
+      npdes: 'npdes',
+      rcra: 'rcra_2263_clipped'
+    };
+    Object.entries(legendMap).forEach(([dotClass, csvKey]) => {
+      const dot = document.querySelector('.legend-dot.' + dotClass);
+      if (!dot) return;
+      dot.style.cursor = 'pointer';
+      dot.setAttribute('tabindex', '0');
+      dot.setAttribute('title', 'Toggle visibility');
+      let visible = true;
+      dot.addEventListener('click', () => {
+        visible = !visible;
+        const group = csvResults[csvKey]?.group;
+        if (group) group.visible = visible;
+        dot.style.opacity = visible ? '1' : '0.35';
+      });
+      dot.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          dot.click();
+        }
+      });
+    });
 
     // 5. Tooltips via raycasting
     const tickSprites = setupTooltips(camera, scene, tooltipEl);
