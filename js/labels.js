@@ -5,6 +5,7 @@
  * but is rendered as a DOM element (resolution-independent, always readable).
  */
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { openDetail } from './detailPanel.js';
 
 /**
  * Create a CSS2D label and add it to the scene.
@@ -48,4 +49,59 @@ export function addAllLabels(scene) {
 
   // "EAST WILLIAMSBURG" – two-line, centre-aligned; adjust x, y, z to reposition
   addLabel(scene, 'EAST WILLIAMSBURG', 1100, 150, 1800);
+}
+
+/**
+ * Create a camera-facing image anchored in world space using CSS2DObject.
+ * @param {THREE.Scene} scene
+ * @param {string} id    Identifier (e.g. 'IMG_1')
+ * @param {string} src   Image URL
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @param {object} [opts]
+ */
+export function addImage(scene, id, src, x, y, z, opts = {}) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'scene-image' + (opts.className ? ` ${opts.className}` : '');
+
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = id;
+  img.draggable = false;
+  wrapper.appendChild(img);
+
+  // Open the detail overlay on click/tap — show a frosted overlay with the image
+  img.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    // Use a simple title and pass the image src to the detail panel
+    openDetail({ title: 'Lorem Ipsum', body: '', image: src });
+  });
+
+  // Optional caption
+  if (opts.caption) {
+    const cap = document.createElement('div');
+    cap.className = 'scene-image-caption';
+    cap.textContent = opts.caption;
+    wrapper.appendChild(cap);
+  }
+
+  const obj = new CSS2DObject(wrapper);
+  obj.position.set(x, y, z);
+  obj.name = `image:${id}`;
+  scene.add(obj);
+  return obj;
+}
+
+/**
+ * Add the four IMG anchors near the model origin so you can see and fine-tune them.
+ * Positions are scene-space; edit coordinates here or move in devtools.
+ */
+export function addAllImages(scene) {
+  // Near the Rhino origin — small offsets so they're visible above terrain
+  addImage(scene, 'IMG_1', './assets/images/IMG_1.jpg', 450, 100, -725);
+  addImage(scene, 'IMG_2', './assets/images/IMG_2.jpg', 700, 100, -100);
+  addImage(scene, 'IMG_3', './assets/images/IMG_3.jpg', -325, 100, -1550);
+  addImage(scene, 'IMG_4', './assets/images/IMG_4.jpg', -75, 100, -1525);
 }

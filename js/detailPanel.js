@@ -46,6 +46,7 @@ function fallbackContent(type) {
 
 /* ---------- DOM refs ---------- */
 let panel, titleEl, bodyEl, backBtn;
+let mediaEl;
 let isOpen = false;
 let domReady = false;
 let closedAt = 0;   // timestamp of last close, used to debounce re-open
@@ -55,6 +56,8 @@ function ensureDOM() {
   panel   = document.getElementById('detail-panel');
   titleEl = document.getElementById('detail-title');
   bodyEl  = document.getElementById('detail-body');
+  // optional media element (created dynamically when needed)
+  mediaEl = document.getElementById('detail-image') || null;
   backBtn = document.getElementById('detail-back');
   domReady = true;
 }
@@ -83,19 +86,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ---------- Open / close ---------- */
 
-export function openDetail(type) {
+export function openDetail(payload) {
   ensureDOM();
   if (isOpen) return;
-  const content = DATASET_CONTENT[type] || fallbackContent(type);
 
-  titleEl.textContent = content.title;
-  bodyEl.textContent  = content.body;
+  // Support both string keys (dataset types) and direct content objects
+  let content;
+  if (typeof payload === 'string') {
+    content = DATASET_CONTENT[payload] || fallbackContent(payload);
+  } else {
+    // Expect an object like { title, body, image }
+    content = payload || {};
+  }
+
+  titleEl.textContent = content.title || '';
+  bodyEl.textContent  = content.body || '';
+
+  // Remove previous media if present
+  const prev = document.getElementById('detail-image');
+  if (prev) prev.remove();
+
+  // If an image is supplied, create and insert it after the title
+  if (content.image) {
+    const img = document.createElement('img');
+    img.id = 'detail-image';
+    img.className = 'detail-panel-image';
+    img.src = content.image;
+    img.alt = content.title || '';
+    img.loading = 'eager';
+    titleEl.insertAdjacentElement('afterend', img);
+  }
 
   panel.classList.remove('hidden');
   isOpen = true;
 
   // Push a history entry so browser Back returns to the map
-  history.pushState({ detailPanel: true, type }, '', `#${type.toLowerCase()}`);
+  // If content came from a named type, preserve that in history, otherwise use 'image'
+  const histType = (typeof payload === 'string') ? payload : 'image';
+  history.pushState({ detailPanel: true, type: histType }, '', `#${String(histType).toLowerCase()}`);
 }
 
 export function closeDetail() {

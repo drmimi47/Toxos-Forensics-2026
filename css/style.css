@@ -12,6 +12,7 @@
   --border-bright: rgba(4, 22, 118, 0.18);
   --text:          #1a1a2a;
   --text-dim:      #6b6b7a;
+  --scene-image-brightness: 0.60; /* set <1 to darken, >1 to brighten */
   --cso-color:     #667B05;
   --npdes-color:   #E8820C;
   --font-sans:     'IBM Plex Sans', system-ui, -apple-system, sans-serif;
@@ -311,6 +312,7 @@ html, body {
 .detail-content {
   max-width: 720px;
   margin: 60px auto 0;
+  text-align: center;
 }
 
 .detail-title {
@@ -330,6 +332,7 @@ html, body {
   line-height: 1.75;
   color: var(--text-dim);
   margin: 0;
+  text-align: center;
 }
 
 /* ===== Footer ===== */
@@ -394,9 +397,9 @@ html, body {
 /* ===== CSS2D Scene Labels ===== */
 .scene-label {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-weight: 600;
-  font-size: 20px;
-  color: #000000;
+  font-weight: 525;
+  font-size: 17px;
+  color: #444444;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: pre-line;
@@ -405,6 +408,50 @@ html, body {
   user-select: none;
   -webkit-text-stroke: none;
   paint-order: stroke fill;
+}
+
+/* Anchored images (CSS2D) */
+.scene-image {
+  pointer-events: none;
+  user-select: none;
+  display: inline-block;
+  transform-origin: center center;
+}
+.scene-image img {
+  display: block;
+  width: auto;
+  height: 55px;
+  opacity: 0.95;
+  filter: invert(1) brightness(var(--scene-image-brightness, 0.85));
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.12);
+  -webkit-user-drag: none;
+  /* slowed animation: originally 0.22s, made ~1.8x slower -> ~0.4s */
+  transition: transform 0.40s cubic-bezier(.5,1.7,.5,1), opacity 0.32s;
+  transform-origin: center center;
+}
+.scene-image img:hover {
+  transform: scale(1.18);
+}
+.scene-image-caption {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #333;
+  text-align: center;
+}
+
+/* Enlarged image inside the detail panel */
+.detail-panel-image {
+  display: block;
+  max-width: 82%;
+  max-height: 72vh;
+  width: auto;
+  height: auto;
+  margin: 22px auto;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.45);
 }
 
 

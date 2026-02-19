@@ -12,7 +12,7 @@ import { createViewer }   from './viewer.js';
 import { loadModel } from './gltfLoader.js';
 import { loadAllCSV }     from './csvLoader.js';
 import { setupTooltips, frameBoundingBox, animateIntro } from './utils.js';
-import { addAllLabels }   from './labels.js';
+import { addAllLabels, addAllImages }   from './labels.js';
 
 
 /* ---------- Preloader helpers ---------- */
@@ -59,8 +59,9 @@ async function init() {
     // 4. Overlay CSV data points
     const csvResults = await loadAllCSV(scene);
 
-    // 4b. Add CSS2D point-of-interest labels
+    // 4b. Add CSS2D point-of-interest labels and anchored images
     addAllLabels(scene);
+    addAllImages(scene);
 
     // Update legend counts
     if (csvResults.cso) {
