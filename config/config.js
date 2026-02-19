@@ -43,7 +43,7 @@ const CONFIG = {
   csvFiles: {
     cso:   { path: './data/cso_2263_clipped.csv',   color: 0x00FFFF, label: 'CSO' },
     npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, label: 'NPDES' },
-    rcra_2263_clipped: { path: './data/rcra_2263_clipped.csv', color: 0x757139, label: 'RCRA' }
+    rcra_2263_clipped: { path: './data/rcra_2263_clipped.csv', color: 0x515B28, label: 'RCRA' }
   },
 
   /* ---- Point marker settings ---- */
