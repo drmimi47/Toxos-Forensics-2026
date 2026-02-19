@@ -14,7 +14,7 @@
   --accent-dim:    #4d5c04;
   --accent-glow:   rgba(102, 123, 5, 0.25);
   --bg-dark:       #eeeeee;
-  --bg-panel:      rgba(255, 255, 255, 0.45);
+  --bg-panel:      rgba(255, 255, 255, 0.9);
   --bg-panel-solid:#ffffff;
   --border:        rgba(4, 22, 118, 0.10);
   --border-bright: rgba(4, 22, 118, 0.18);
@@ -31,7 +31,7 @@
 /* ===== Dark Mode Tokens ===== */
 body.dark {
   --bg-dark:       #0c0c0c;
-  --bg-panel:      rgba(255, 255, 255, 0.02);
+  --bg-panel:      rgba(30, 30, 30, 0.9);
   --bg-panel-solid:#111111;
   --border:        rgba(255, 255, 255, 0.08);
   --border-bright: rgba(255, 255, 255, 0.15);
@@ -266,8 +266,8 @@ html, body {
   position: absolute;
   z-index: 20;
   background: var(--bg-panel);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-bright);
   border-radius: 6px;
   padding: 10px 14px;
@@ -314,8 +314,8 @@ html, body {
   inset: 0;
   z-index: 100;
   background: var(--bg-panel);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   flex-direction: column;
   padding: 60px 48px 48px;
@@ -333,25 +333,20 @@ html, body {
 
 .detail-back {
   position: absolute;
-  top: 24px;
+  top: 32px;
   left: 32px;
   background: none;
-  border: 1px solid var(--border-bright);
-  border-radius: 6px;
+  border: 0px solid black;
   padding: 8px 18px;
   font-family: var(--font-sans);
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text);
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 0.2s, border-color 0.2s;
 }
 
 .detail-back:hover {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: var(--accent);
+  opacity: 0.6;
 }
 
 .detail-content {
@@ -375,7 +370,7 @@ html, body {
   font-weight: 300;
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--text-dim);
+  color: var(--text);
   margin: 0;
   text-align: center;
 }
@@ -392,8 +387,8 @@ html, body {
   justify-content: space-between;
   padding: 20px 24px 24px 24px;
   background: var(--bg-panel);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   pointer-events: none;
 }
