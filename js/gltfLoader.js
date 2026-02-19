@@ -29,12 +29,12 @@ export async function loadModel(scene, onProgress) {
     return new Promise((res, rej) => {
       new THREE.TextureLoader().load(path, (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
-        tex.flipY    = false;
+        tex.flipY = false;
         tex.rotation = Math.PI;
         tex.center.set(0.5, 0.5);
         tex.repeat.x = -1;
-        tex.wrapS    = THREE.RepeatWrapping;
-        tex.wrapT    = THREE.RepeatWrapping;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
         tex.needsUpdate = true;
         res(tex);
       }, undefined, rej);
@@ -47,15 +47,13 @@ export async function loadModel(scene, onProgress) {
     loadTex('./assets/textures/gltf_embedded_0_light.png'),
   ]);
 
-  // MeshStandardMaterial with onBeforeCompile to crossfade two textures via mixT (0=light, 1=dark).
-  // Keeps the full PBR + tone-mapping pipeline identical to the original look.
+  // MeshBasicMaterial with onBeforeCompile to crossfade two textures via mixT (0=light, 1=dark).
+  // toneMapped:false bypasses ACES so terrain shows at exact PNG brightness.
   function makeCrossfadeMat() {
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshBasicMaterial({
       map: lightTex,
-      color: 0xffffff,
-      metalness: 0,
-      roughness: 1,
       side: THREE.FrontSide,
+      toneMapped: false,
     });
 
     const uniforms = { mapDark: { value: darkTex }, mixT: { value: 0.0 } };
@@ -85,7 +83,7 @@ export async function loadModel(scene, onProgress) {
       CONFIG.modelPath,
       (gltf) => {
         const model = gltf.scene;
-        const topoTopMats  = [];  // top-face materials (textured)
+        const topoTopMats = [];  // top-face materials (textured)
         const topoSideMats = [];  // side/bottom materials
         const buildingMats = [];  // building materials
 
@@ -207,7 +205,7 @@ export async function loadModel(scene, onProgress) {
           const rangeZ = (bb.max.z - bb.min.z) || 1;
           const uvArray = new Float32Array(pos.count * 2);
           for (let i = 0; i < pos.count; i++) {
-            uvArray[i * 2]     = (pos.array[i * 3]     - bb.min.x) / rangeX;
+            uvArray[i * 2] = (pos.array[i * 3] - bb.min.x) / rangeX;
             uvArray[i * 2 + 1] = (pos.array[i * 3 + 2] - bb.min.z) / rangeZ;
           }
           geom.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
@@ -228,9 +226,9 @@ export async function loadModel(scene, onProgress) {
 
         // Fixed endpoints for lerping
         const B_LIGHT = new THREE.Color(0x4a4a4a);
-        const B_DARK  = new THREE.Color(0xffffff);
-        const S_LIGHT = new THREE.Color(0x111111);
-        const S_DARK  = new THREE.Color(0x777777);
+        const B_DARK = new THREE.Color(0xffffff);
+        const S_LIGHT = new THREE.Color(0x4a4a4a);
+        const S_DARK = new THREE.Color(0xffffff);
 
         // t = 0 → full light mode, t = 1 → full dark mode
         const setModeProgress = (t) => {
@@ -241,12 +239,13 @@ export async function loadModel(scene, onProgress) {
           // Lerp building colors
           for (const mat of buildingMats) {
             mat.color.lerpColors(B_LIGHT, B_DARK, t);
+            // mat.emissive.lerpColors(S_LIGHT, S_DARK, t);
             mat.needsUpdate = true;
           }
           // Lerp topo side colors
           for (const mat of topoSideMats) {
             mat.color.lerpColors(S_LIGHT, S_DARK, t);
-            mat.emissive.lerpColors(S_LIGHT, S_DARK, t);
+            // mat.emissive.lerpColors(S_LIGHT, S_DARK, t);
             mat.needsUpdate = true;
           }
         };
