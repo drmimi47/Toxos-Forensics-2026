@@ -36,26 +36,26 @@ function hidePreloader() {
 
 /* ---------- Boot ---------- */
 async function init() {
-  setProgress(5, 'Setting up scene…');
+  setProgress(5, 'Setting up scene');
 
   // 1. Spin up the 3D viewer
   const { scene, camera, renderer, controls, setTickSprites } = createViewer();
   const tooltipEl = document.getElementById('tooltip');
 
   try {
-    setProgress(10, 'Loading 3D model…');
+    setProgress(10, 'Loading 3D model');
 
     // 2. Load the GLB model
     const { model, setModeProgress } = await loadModel(scene, (pct) => {
-      setProgress(10 + pct * 0.7, `Loading model… ${Math.round(pct)}%`);
+      setProgress(10 + pct * 0.7, `Loading model ${Math.round(pct)}%`);
     }, renderer);
 
-    setProgress(80, 'Framing view…');
+    setProgress(80, 'Framing view');
 
     // 3. Auto-frame the camera around the loaded model
     frameBoundingBox(model, camera, controls);
 
-    setProgress(85, 'Loading data overlays…');
+    setProgress(85, 'Loading data overlays');
 
     // 4. Overlay CSV data points
     const csvResults = await loadAllCSV(scene);
@@ -92,7 +92,7 @@ async function init() {
     let modePrevTime = performance.now();
 
     function tickModeFrame(now) {
-      const dt = (now - modePrevTime) / 500; // 500ms total duration
+      const dt = (now - modePrevTime) / 200; // 500ms total duration
       modePrevTime = now;
 
       if (modeTarget > modeT) modeT = Math.min(modeT + dt, modeTarget);
