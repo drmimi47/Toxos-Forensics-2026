@@ -41,6 +41,12 @@ body.dark {
   --label:         #000000;
 }
 
+body.dark {
+  --cso-color:   #0000FF;
+  --npdes-color: #FF006F;
+  --rcra-color:  #B1C074;
+}
+
 body.dark .footer-controls .key { background: rgba(255, 255, 255, 0.10); transition: background 0.5s ease; }
 
 /* ===== Dark Mode Button ===== */

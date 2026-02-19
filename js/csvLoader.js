@@ -46,11 +46,18 @@ function createDotTexture(color, size = 64) {
   const half = size / 2;
   const radius = half * 0.72;
 
-  // Solid filled circle (no outline)
+  // Fill entire canvas with the dot color first, then punch the circle
+  // shape as an alpha mask using destination-in. This ensures anti-aliased
+  // edge pixels fade from full color → transparent (same hue) rather than
+  // blending into transparent-black, which would create a dark fringe ring.
+  ctx.fillStyle = hex;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalCompositeOperation = 'destination-in';
   ctx.beginPath();
   ctx.arc(half, half, radius, 0, Math.PI * 2);
-  ctx.fillStyle = hex;
+  ctx.fillStyle = 'black'; // color irrelevant with destination-in; only alpha matters
   ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;  // ensure colors display at full vibrancy
@@ -77,15 +84,16 @@ function toSceneCoords(xEpsg, yEpsg) {
  * Load a CSV file and add sprite markers to the scene.
  * Sprites use sizeAttenuation=true with dynamic scale adjustment for constant screen size.
  */
-export async function loadCSVPoints(scene, csvPath, color, label) {
+export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
   const response = await fetch(csvPath);
   const text = await response.text();
   const rows = parseCSV(text);
 
-  const dotMap = createDotTexture(color);
+  const lightTex = createDotTexture(color);
+  const darkTex  = createDotTexture(darkColor ?? color);
 
   const material = new THREE.SpriteMaterial({
-    map: dotMap,
+    map: lightTex,
     sizeAttenuation: true,    // world-unit sizing; we dynamically adjust scale for constant screen size
     transparent: true,
     depthWrite: false,
@@ -106,7 +114,8 @@ export async function loadCSVPoints(scene, csvPath, color, label) {
     if (Number.isNaN(x) || Number.isNaN(y)) return;
 
     const pos = toSceneCoords(x, y);
-    const sprite = new THREE.Sprite(material.clone());
+    // Share material across sprites — no clone needed; all dots in a group look identical
+    const sprite = new THREE.Sprite(material);
     sprite.position.copy(pos);
 
     sprite.scale.set(markerSize, markerSize, 1);
@@ -125,7 +134,7 @@ export async function loadCSVPoints(scene, csvPath, color, label) {
 
   scene.add(group);
   console.log(`[csvLoader] ${label}: ${group.children.length} points loaded from ${csvPath}`);
-  return { group, rows };
+  return { group, rows, material, lightTex, darkTex };
 }
 
 /**
@@ -134,7 +143,7 @@ export async function loadCSVPoints(scene, csvPath, color, label) {
 export async function loadAllCSV(scene) {
   const results = {};
   for (const [key, cfg] of Object.entries(CONFIG.csvFiles)) {
-    results[key] = await loadCSVPoints(scene, cfg.path, cfg.color, cfg.label);
+    results[key] = await loadCSVPoints(scene, cfg.path, cfg.color, cfg.darkColor, cfg.label);
   }
   return results;
 }

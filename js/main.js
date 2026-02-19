@@ -134,6 +134,14 @@ async function init() {
       if (modeTarget === 1 && modeT >= 0.5) document.body.classList.add('dark');
       if (modeTarget === 0 && modeT <= 0.5) document.body.classList.remove('dark');
 
+      // Swap marker dot textures at the midpoint
+      const isDarkNow = modeT >= 0.5;
+      for (const result of Object.values(csvResults)) {
+        if (!result?.material) continue;
+        const tex = isDarkNow ? result.darkTex : result.lightTex;
+        if (result.material.map !== tex) { result.material.map = tex; result.material.needsUpdate = true; }
+      }
+
       setModeProgress(modeT);
       scene.background.lerpColors(BG_LIGHT, BG_DARK, modeT);
 
