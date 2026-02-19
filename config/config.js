@@ -41,13 +41,13 @@ const CONFIG = {
 
   /* ---- CSV Data ---- */
   csvFiles: {
-    cso:   { path: './data/cso_2263_clipped.csv',   color: 0xA7CE08, label: 'CSO' },
-    npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xFFBF00, label: 'NPDES' }
+    cso:   { path: './data/cso_2263_clipped.csv',   color: 0x00FFFF, label: 'CSO' },
+    npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, label: 'NPDES' }
   },
 
   /* ---- Point marker settings ---- */
   marker: {
-    screenSize: 0.016,   // sprite scale when sizeAttenuation=false (perspective)
+    screenSize: 0.008,   // sprite scale when sizeAttenuation=false (perspective)
     worldSize: 80,       // sprite scale in world units for ortho camera
     heightOffset: 15     // lift markers slightly above terrain (metres)
   },

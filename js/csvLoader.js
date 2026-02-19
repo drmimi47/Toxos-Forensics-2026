@@ -90,7 +90,8 @@ export async function loadCSVPoints(scene, csvPath, color, label) {
     transparent: true,
     depthWrite: false,
     depthTest: false,         // always render on top of geometry
-    blending: THREE.NormalBlending
+    blending: THREE.NormalBlending,
+    toneMapped: false,        // bypass ACES tone mapping so colors match the hex exactly
   });
 
   const group = new THREE.Group();

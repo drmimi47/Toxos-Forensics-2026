@@ -8,6 +8,7 @@
  * 5. Sets up interactive tooltips.
  * 6. Fades out the preloader.
  */
+import * as THREE from 'three';
 import { createViewer }   from './viewer.js';
 import { loadModel } from './gltfLoader.js';
 import { loadAllCSV }     from './csvLoader.js';
@@ -45,7 +46,7 @@ async function init() {
     setProgress(10, 'Loading 3D model…');
 
     // 2. Load the GLB model
-    const model = await loadModel(scene, (pct) => {
+    const { model, setModeProgress } = await loadModel(scene, (pct) => {
       setProgress(10 + pct * 0.7, `Loading model… ${Math.round(pct)}%`);
     }, renderer);
 
@@ -81,6 +82,44 @@ async function init() {
 
     // 6. Done!
     hidePreloader();
+
+    // Dark mode — smooth crossfade via RAF lerp
+    const BG_LIGHT = new THREE.Color(0xeeeeee);
+    const BG_DARK  = new THREE.Color(0x111111);
+    let modeT      = 0;   // current interpolation value (0=light, 1=dark)
+    let modeTarget = 0;   // where we're animating towards
+    let modeRafId  = null;
+    let modePrevTime = performance.now();
+
+    function tickModeFrame(now) {
+      const dt = (now - modePrevTime) / 500; // 500ms total duration
+      modePrevTime = now;
+
+      if (modeTarget > modeT) modeT = Math.min(modeT + dt, modeTarget);
+      else                     modeT = Math.max(modeT - dt, modeTarget);
+
+      // Toggle CSS class at midpoint so @property transitions meet symmetrically
+      if (modeTarget === 1 && modeT >= 0.5) document.body.classList.add('dark');
+      if (modeTarget === 0 && modeT <= 0.5) document.body.classList.remove('dark');
+
+      setModeProgress(modeT);
+      scene.background.lerpColors(BG_LIGHT, BG_DARK, modeT);
+
+      if (Math.abs(modeT - modeTarget) > 0.0001) {
+        modeRafId = requestAnimationFrame(tickModeFrame);
+      } else {
+        modeT = modeTarget;
+        setModeProgress(modeT); // ensure endpoints (texture swap) are applied
+        modeRafId = null;
+      }
+    }
+
+    document.getElementById('dark-mode-btn')?.addEventListener('click', () => {
+      if (modeRafId) return; // ignore while animating
+      modeTarget     = modeT < 0.5 ? 1 : 0;
+      modePrevTime   = performance.now();
+      modeRafId      = requestAnimationFrame(tickModeFrame);
+    });
 
     // 7. Gentle camera intro animation (pivot down into isometric view)
     animateIntro(camera, controls, 1750);

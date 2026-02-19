@@ -1,8 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
 
+/* ===== Animatable CSS Custom Properties ===== */
+@property --bg-dark       { syntax: '<color>'; inherits: true; initial-value: #d6d2ca; }
+@property --bg-panel      { syntax: '<color>'; inherits: true; initial-value: rgba(255,255,255,0.45); }
+@property --border        { syntax: '<color>'; inherits: true; initial-value: rgba(4,22,118,0.10); }
+@property --border-bright { syntax: '<color>'; inherits: true; initial-value: rgba(4,22,118,0.18); }
+@property --text          { syntax: '<color>'; inherits: true; initial-value: #1a1a2a; }
+@property --text-dim      { syntax: '<color>'; inherits: true; initial-value: #6b6b7a; }
+
 /* ===== Design Tokens ===== */
 :root {
-  --accent:        #667B05;
+  --accent:        #A7CE08;
   --accent-dim:    #4d5c04;
   --accent-glow:   rgba(102, 123, 5, 0.25);
   --bg-dark:       #d6d2ca;
@@ -13,11 +21,41 @@
   --text:          #1a1a2a;
   --text-dim:      #6b6b7a;
   --scene-image-brightness: 0.60; /* set <1 to darken, >1 to brighten */
-  --cso-color:     #667B05;
-  --npdes-color:   #E8820C;
+  --cso-color:     #00ffff;
+  --npdes-color:   #ff3800;
   --font-sans:     'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --font-mono:     'IBM Plex Mono', 'Consolas', monospace;
+  --label:         #ffffff;
 }
+
+/* ===== Dark Mode Tokens ===== */
+body.dark {
+  --bg-dark:       #0c0c0c;
+  --bg-panel:      rgba(255, 255, 255, 0.02);
+  --bg-panel-solid:#111111;
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-bright: rgba(255, 255, 255, 0.15);
+  --text:          #e8e8e8;
+  --text-dim:      #888888;
+  --label:         #000000;
+}
+
+body.dark .footer-controls .key { background: rgba(255, 255, 255, 0.10); transition: background 0.5s ease; }
+
+/* ===== Dark Mode Button ===== */
+.dark-mode-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  pointer-events: all;
+  color: var(--text);
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+.dark-mode-btn:hover { opacity: 0.6; }
 
 /* ===== Global Reset & Base ===== */
 *, *::before, *::after {
@@ -36,11 +74,18 @@ html, body {
   background: var(--bg-dark);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  transition:
+    --bg-dark 0.5s ease,
+    --bg-panel 0.5s ease,
+    --border 0.5s ease,
+    --border-bright 0.5s ease,
+    --text 0.5s ease,
+    --text-dim 0.5s ease;
 }
 
 ::selection {
   background: var(--accent);
-  color: var(--bg-dark);
+  color: var(--bg-panel-solid);
 }
 
 /* ===== Scrollbar ===== */
@@ -123,7 +168,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 12px 24px;
   background: transparent;
   pointer-events: none;
 }
@@ -141,7 +186,7 @@ html, body {
   font-weight: 500;
   font-size: 2.025rem;
   letter-spacing: 0.3em;
-  color: #1a1a2a;
+  color: var(--text);
 }
 
 .brand-divider {
@@ -160,15 +205,10 @@ html, body {
 /* ===== Legend ===== */
 #legend {
   position: absolute;
-  bottom: 76px;
-  left: 24px;
+  bottom: 64px;
+  left: 0px;
   z-index: 10;
-  background: var(--bg-panel);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px 18px;
+  padding: 24px 24px;
   min-width: 190px;
 }
 
@@ -345,7 +385,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 24px;
+  padding: 20px 24px 24px 24px;
   background: var(--bg-panel);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -398,8 +438,9 @@ html, body {
 .scene-label {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-weight: 525;
-  font-size: 17px;
-  color: #444444;
+  font-size: 12px;
+  color:  var(--label);
+  opacity: 0.4;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: pre-line;
@@ -438,7 +479,7 @@ html, body {
 .scene-image-caption {
   margin-top: 6px;
   font-size: 12px;
-  color: #333;
+  color: var(--text-dim);
   text-align: center;
 }
 

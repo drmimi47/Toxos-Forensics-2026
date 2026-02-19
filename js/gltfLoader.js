@@ -24,50 +24,70 @@ export async function loadModel(scene, onProgress) {
   draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
   loader.setDRACOLoader(draco);
 
-  // Pre-load the replacement texture
-  const textureLoader = new THREE.TextureLoader();
-  const replacementTexture = await new Promise((res, rej) => {
-    textureLoader.load(
-      './assets/textures/gltf_embedded_0.jpeg',
-      (tex) => {
-        // Convert texture to grayscale via canvas
-        const img = tex.image;
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const d = imageData.data;
-        const contrast = 0.4;   // 0 = flat gray, 1 = full contrast
-        const midpoint = 190;   // anchor brightness level
-        for (let i = 0; i < d.length; i += 4) {
-          let gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          gray = midpoint + (gray - midpoint) * contrast;  // compress toward midpoint
-          gray = Math.max(0, Math.min(255, gray));
-          d[i] = d[i + 1] = d[i + 2] = gray;
-        }
-        ctx.putImageData(imageData, 0, 0);
-        tex.image = canvas;
+  // Helper: load a texture with all UV transforms pre-applied
+  function loadTex(path) {
+    return new Promise((res, rej) => {
+      new THREE.TextureLoader().load(path, (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
-        tex.flipY = false;          // glTF convention: textures are NOT flipped
+        tex.flipY    = false;
+        tex.rotation = Math.PI;
+        tex.center.set(0.5, 0.5);
+        tex.repeat.x = -1;
+        tex.wrapS    = THREE.RepeatWrapping;
+        tex.wrapT    = THREE.RepeatWrapping;
         tex.needsUpdate = true;
-        console.log('[gltfLoader] Replacement texture loaded (grayscale).');
         res(tex);
-      },
-      undefined,
-      (err) => {
-        console.error('[gltfLoader] Failed to load replacement texture:', err);
-        rej(err);
-      }
-    );
-  });
+      }, undefined, rej);
+    });
+  }
+
+  // Pre-load both textures in parallel so mode switching is instant
+  const [lightTex, darkTex] = await Promise.all([
+    loadTex('./assets/textures/gltf_embedded_0.png'),
+    loadTex('./assets/textures/gltf_embedded_0_light.png'),
+  ]);
+
+  // MeshStandardMaterial with onBeforeCompile to crossfade two textures via mixT (0=light, 1=dark).
+  // Keeps the full PBR + tone-mapping pipeline identical to the original look.
+  function makeCrossfadeMat() {
+    const mat = new THREE.MeshStandardMaterial({
+      map: lightTex,
+      color: 0xffffff,
+      metalness: 0,
+      roughness: 1,
+      side: THREE.FrontSide,
+    });
+
+    const uniforms = { mapDark: { value: darkTex }, mixT: { value: 0.0 } };
+    mat.userData.crossfadeUniforms = uniforms;
+
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.fragmentShader = [
+        'uniform sampler2D mapDark;',
+        'uniform float mixT;',
+        shader.fragmentShader,
+      ].join('\n').replace(
+        '#include <map_fragment>',
+        `#ifdef USE_MAP
+          vec4 texelLight = texture2D( map, vMapUv );
+          vec4 texelDark  = texture2D( mapDark, vMapUv );
+          diffuseColor *= mix(texelLight, texelDark, mixT);
+        #endif`
+      );
+    };
+
+    return mat;
+  }
 
   return new Promise((resolve, reject) => {
     loader.load(
       CONFIG.modelPath,
       (gltf) => {
         const model = gltf.scene;
+        const topoTopMats  = [];  // top-face materials (textured)
+        const topoSideMats = [];  // side/bottom materials
+        const buildingMats = [];  // building materials
 
         // Optionally rotate if exporter did NOT handle Z-up → Y-up
         if (CONFIG.rotateZUp) {
@@ -99,13 +119,10 @@ export async function loadModel(scene, onProgress) {
             const normalAttr = geom.attributes.normal;
 
             if (!index || !normalAttr) {
-              // Fallback: apply texture to entire mesh if no index/normals
-              const mat = child.material;
-              mat.map = replacementTexture;
-              mat.color.set(0xffffff);
-              mat.metalness = 0;
-              mat.roughness = 1;
-              mat.needsUpdate = true;
+              // Fallback: apply crossfade material to entire mesh if no index/normals
+              const mat = makeCrossfadeMat();
+              child.material = mat;
+              topoTopMats.push(mat);
               return;
             }
 
@@ -144,25 +161,21 @@ export async function loadModel(scene, onProgress) {
             geom.addGroup(0, topIndices.length, 0);                      // group 0 = textured top
             geom.addGroup(topIndices.length, sideIndices.length, 1);     // group 1 = plain sides
 
-            // Textured material for top faces
-            const topMat = new THREE.MeshStandardMaterial({
-              map: replacementTexture,
-              color: 0xffffff,
-              metalness: 0,
-              roughness: 1,
-              side: THREE.FrontSide,
-            });
+            // Crossfade shader material for top faces
+            const topMat = makeCrossfadeMat();
 
             // Plain material for side/bottom faces
             const sideMat = new THREE.MeshStandardMaterial({
-              color: new THREE.Color(0x666666),
+              color: new THREE.Color(0x111111),
               metalness: 0,
               roughness: 1,
               side: THREE.DoubleSide,
-              emissive: new THREE.Color(0x222222),  // slight self-illumination so it's visibly grey
+              emissive: new THREE.Color(0x111111),  // slight self-illumination so it's visibly grey
             });
 
             child.material = [topMat, sideMat];
+            topoTopMats.push(topMat);
+            topoSideMats.push(sideMat);
             console.log(`[gltfLoader] Topo split: ${topIndices.length / 3} top faces, ${sideIndices.length / 3} side faces`);
           }
 
@@ -172,8 +185,10 @@ export async function loadModel(scene, onProgress) {
               ? child.material
               : [child.material];
             for (const mat of materials) {
+              mat.color.set(0x4a4a4a);
               mat.side = THREE.DoubleSide;
               mat.needsUpdate = true;
+              buildingMats.push(mat);
             }
           }
         });
@@ -198,12 +213,6 @@ export async function loadModel(scene, onProgress) {
           geom.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
           geom.attributes.uv.needsUpdate = true;
         }
-        replacementTexture.rotation = Math.PI;          // rotate 180°
-        replacementTexture.center.set(0.5, 0.5);        // rotate around centre
-        replacementTexture.repeat.x = -1;               // mirror X
-        replacementTexture.wrapS = THREE.RepeatWrapping; // needed for negative repeat
-        replacementTexture.wrapT = THREE.RepeatWrapping;
-        replacementTexture.needsUpdate = true;
         console.log('[gltfLoader] UV projection: top(XZ), rot 180°, mirror X applied.');
 
         // Wrap in a group and shift by -offset so model centres near origin
@@ -217,8 +226,33 @@ export async function loadModel(scene, onProgress) {
 
         scene.add(wrapper);
 
+        // Fixed endpoints for lerping
+        const B_LIGHT = new THREE.Color(0x4a4a4a);
+        const B_DARK  = new THREE.Color(0xffffff);
+        const S_LIGHT = new THREE.Color(0x111111);
+        const S_DARK  = new THREE.Color(0x777777);
+
+        // t = 0 → full light mode, t = 1 → full dark mode
+        const setModeProgress = (t) => {
+          // Crossfade terrain texture via onBeforeCompile uniform — no snap
+          for (const mat of topoTopMats) {
+            mat.userData.crossfadeUniforms.mixT.value = t;
+          }
+          // Lerp building colors
+          for (const mat of buildingMats) {
+            mat.color.lerpColors(B_LIGHT, B_DARK, t);
+            mat.needsUpdate = true;
+          }
+          // Lerp topo side colors
+          for (const mat of topoSideMats) {
+            mat.color.lerpColors(S_LIGHT, S_DARK, t);
+            mat.emissive.lerpColors(S_LIGHT, S_DARK, t);
+            mat.needsUpdate = true;
+          }
+        };
+
         console.log('[gltfLoader] Model loaded and offset applied.');
-        resolve(wrapper);
+        resolve({ model: wrapper, setModeProgress });
       },
       (progress) => {
         if (progress.total && onProgress) {

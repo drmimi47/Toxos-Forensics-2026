@@ -31,7 +31,7 @@ export function createViewer() {
 
   // ---- Scene ----
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xd6d2ca);
+  scene.background = new THREE.Color(0xeeeeee);
 
   // ---- Camera (Isometric / Orthographic) ----
   const aspect = container.clientWidth / container.clientHeight;
