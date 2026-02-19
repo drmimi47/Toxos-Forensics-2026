@@ -3,3 +3,5 @@ dist/
 .env
 *.log
 models/*.glb
+assets/textures/*.png
+.DS_Store
