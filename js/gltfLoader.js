@@ -225,9 +225,9 @@ export async function loadModel(scene, onProgress) {
         scene.add(wrapper);
 
         // Fixed endpoints for lerping
-        const B_LIGHT = new THREE.Color(0x4a4a4a);
+        const B_LIGHT = new THREE.Color(0x555555);
         const B_DARK = new THREE.Color(0xffffff);
-        const S_LIGHT = new THREE.Color(0x4a4a4a);
+        const S_LIGHT = new THREE.Color(0x444444);
         const S_DARK = new THREE.Color(0xffffff);
 
         // t = 0 → full light mode, t = 1 → full dark mode
