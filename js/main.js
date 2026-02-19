@@ -73,6 +73,10 @@ async function init() {
       const el = document.getElementById('count-npdes');
       if (el) el.textContent = csvResults.npdes.group.children.length;
     }
+    if (csvResults.rcra_2263_clipped) {
+      const el = document.getElementById('count-rcra');
+      if (el) el.textContent = csvResults.rcra_2263_clipped.group.children.length;
+    }
 
     setProgress(95, 'Preparing interactions…');
 

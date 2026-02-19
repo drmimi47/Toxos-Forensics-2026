@@ -42,7 +42,8 @@ const CONFIG = {
   /* ---- CSV Data ---- */
   csvFiles: {
     cso:   { path: './data/cso_2263_clipped.csv',   color: 0x00FFFF, label: 'CSO' },
-    npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, label: 'NPDES' }
+    npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, label: 'NPDES' },
+    rcra_2263_clipped: { path: './data/rcra_2263_clipped.csv', color: 0x5A189A, label: 'Regulated Hazardous Waste Management Facilities (RCRA)' }
   },
 
   /* ---- Point marker settings ---- */
