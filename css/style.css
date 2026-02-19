@@ -393,19 +393,21 @@ html, body {
 
 /* ===== CSS2D Scene Labels ===== */
 .scene-label {
-  font-family: var(--font-sans);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-weight: 600;
   font-size: 20px;
-  color: #f4efef;
+  color: #000000;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: pre-line;
   text-align: center;
   pointer-events: none;
   user-select: none;
-  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.7);
+  -webkit-text-stroke: none;
   paint-order: stroke fill;
 }
+
+
 
 /* ===== Responsive ===== */
 @media screen and (max-width: 640px) {

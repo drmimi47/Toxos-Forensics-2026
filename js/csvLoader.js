@@ -53,6 +53,7 @@ function createDotTexture(color, size = 64) {
   ctx.fill();
 
   const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;  // ensure colors display at full vibrancy
   texture.needsUpdate = true;
   return texture;
 }
@@ -88,11 +89,13 @@ export async function loadCSVPoints(scene, csvPath, color, label) {
     sizeAttenuation: true,    // world-unit sizing; we dynamically adjust scale for constant screen size
     transparent: true,
     depthWrite: false,
+    depthTest: false,         // always render on top of geometry
     blending: THREE.NormalBlending
   });
 
   const group = new THREE.Group();
   group.name = label;
+  group.renderOrder = 999;    // ensure dots draw after all other objects
 
   const markerSize = CONFIG.marker.worldSize;
 

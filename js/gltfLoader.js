@@ -24,6 +24,45 @@ export async function loadModel(scene, onProgress) {
   draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
   loader.setDRACOLoader(draco);
 
+  // Pre-load the replacement texture
+  const textureLoader = new THREE.TextureLoader();
+  const replacementTexture = await new Promise((res, rej) => {
+    textureLoader.load(
+      './assets/textures/gltf_embedded_0.jpeg',
+      (tex) => {
+        // Convert texture to grayscale via canvas
+        const img = tex.image;
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imageData.data;
+        const contrast = 0.4;   // 0 = flat gray, 1 = full contrast
+        const midpoint = 190;   // anchor brightness level
+        for (let i = 0; i < d.length; i += 4) {
+          let gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          gray = midpoint + (gray - midpoint) * contrast;  // compress toward midpoint
+          gray = Math.max(0, Math.min(255, gray));
+          d[i] = d[i + 1] = d[i + 2] = gray;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        tex.image = canvas;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;          // glTF convention: textures are NOT flipped
+        tex.needsUpdate = true;
+        console.log('[gltfLoader] Replacement texture loaded (grayscale).');
+        res(tex);
+      },
+      undefined,
+      (err) => {
+        console.error('[gltfLoader] Failed to load replacement texture:', err);
+        rej(err);
+      }
+    );
+  });
+
   return new Promise((resolve, reject) => {
     loader.load(
       CONFIG.modelPath,
@@ -34,6 +73,138 @@ export async function loadModel(scene, onProgress) {
         if (CONFIG.rotateZUp) {
           model.rotation.x = -Math.PI / 2;
         }
+
+        // Find the "topography" subtree — only apply texture there, skip "buildings"
+        let topoNode = null;
+        model.traverse((child) => {
+          if (child.name === 'topography') topoNode = child;
+        });
+
+        // Helper: check if a mesh is inside the topography subtree
+        function isTopoMesh(mesh) {
+          let node = mesh;
+          while (node) {
+            if (node === topoNode) return true;
+            node = node.parent;
+          }
+          return false;
+        }
+
+        // Replace textures only on TOP-FACING faces of topography meshes
+        model.traverse((child) => {
+          if (child.isMesh && child.material && isTopoMesh(child)) {
+            const geom = child.geometry;
+            const index = geom.index;
+            const posAttr = geom.attributes.position;
+            const normalAttr = geom.attributes.normal;
+
+            if (!index || !normalAttr) {
+              // Fallback: apply texture to entire mesh if no index/normals
+              const mat = child.material;
+              mat.map = replacementTexture;
+              mat.color.set(0xffffff);
+              mat.metalness = 0;
+              mat.roughness = 1;
+              mat.needsUpdate = true;
+              return;
+            }
+
+            // Sort triangles into top-facing vs side/bottom based on averaged face normal
+            const topIndices = [];
+            const sideIndices = [];
+            const triCount = index.count / 3;
+            const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+
+            for (let t = 0; t < triCount; t++) {
+              const i0 = index.getX(t * 3);
+              const i1 = index.getX(t * 3 + 1);
+              const i2 = index.getX(t * 3 + 2);
+
+              // Average vertex normals for this face
+              vA.set(normalAttr.getX(i0), normalAttr.getY(i0), normalAttr.getZ(i0));
+              vB.set(normalAttr.getX(i1), normalAttr.getY(i1), normalAttr.getZ(i1));
+              vC.set(normalAttr.getX(i2), normalAttr.getY(i2), normalAttr.getZ(i2));
+              const avgY = (vA.y + vB.y + vC.y) / 3;
+
+              if (avgY > 0.3) {              // face points mostly upward
+                topIndices.push(i0, i1, i2);
+              } else {
+                sideIndices.push(i0, i1, i2);
+              }
+            }
+
+            // Rebuild index buffer: top faces first, then side faces
+            const newIndexArray = new Uint32Array(topIndices.length + sideIndices.length);
+            newIndexArray.set(topIndices, 0);
+            newIndexArray.set(sideIndices, topIndices.length);
+            geom.setIndex(new THREE.BufferAttribute(newIndexArray, 1));
+
+            // Clear old groups and add two material groups
+            geom.clearGroups();
+            geom.addGroup(0, topIndices.length, 0);                      // group 0 = textured top
+            geom.addGroup(topIndices.length, sideIndices.length, 1);     // group 1 = plain sides
+
+            // Textured material for top faces
+            const topMat = new THREE.MeshStandardMaterial({
+              map: replacementTexture,
+              color: 0xffffff,
+              metalness: 0,
+              roughness: 1,
+              side: THREE.FrontSide,
+            });
+
+            // Plain material for side/bottom faces
+            const sideMat = new THREE.MeshStandardMaterial({
+              color: new THREE.Color(0x666666),
+              metalness: 0,
+              roughness: 1,
+              side: THREE.DoubleSide,
+              emissive: new THREE.Color(0x222222),  // slight self-illumination so it's visibly grey
+            });
+
+            child.material = [topMat, sideMat];
+            console.log(`[gltfLoader] Topo split: ${topIndices.length / 3} top faces, ${sideIndices.length / 3} side faces`);
+          }
+
+          // Fix buildings: render both sides so no faces appear missing
+          if (child.isMesh && child.material && !isTopoMesh(child)) {
+            const materials = Array.isArray(child.material)
+              ? child.material
+              : [child.material];
+            for (const mat of materials) {
+              mat.side = THREE.DoubleSide;
+              mat.needsUpdate = true;
+            }
+          }
+        });
+        // ---- Hard-coded UV projection: top-down (XZ), rotate 180°, mirror X ----
+        const topoMeshes = [];
+        model.traverse((child) => {
+          if (child.isMesh && isTopoMesh(child)) topoMeshes.push(child);
+        });
+        for (const mesh of topoMeshes) {
+          const geom = mesh.geometry;
+          const pos = geom.attributes.position;
+          if (!pos) continue;
+          geom.computeBoundingBox();
+          const bb = geom.boundingBox;
+          const rangeX = (bb.max.x - bb.min.x) || 1;
+          const rangeZ = (bb.max.z - bb.min.z) || 1;
+          const uvArray = new Float32Array(pos.count * 2);
+          for (let i = 0; i < pos.count; i++) {
+            uvArray[i * 2]     = (pos.array[i * 3]     - bb.min.x) / rangeX;
+            uvArray[i * 2 + 1] = (pos.array[i * 3 + 2] - bb.min.z) / rangeZ;
+          }
+          geom.setAttribute('uv', new THREE.BufferAttribute(uvArray, 2));
+          geom.attributes.uv.needsUpdate = true;
+        }
+        replacementTexture.rotation = Math.PI;          // rotate 180°
+        replacementTexture.center.set(0.5, 0.5);        // rotate around centre
+        replacementTexture.repeat.x = -1;               // mirror X
+        replacementTexture.wrapS = THREE.RepeatWrapping; // needed for negative repeat
+        replacementTexture.wrapT = THREE.RepeatWrapping;
+        replacementTexture.needsUpdate = true;
+        console.log('[gltfLoader] UV projection: top(XZ), rot 180°, mirror X applied.');
 
         // Wrap in a group and shift by -offset so model centres near origin
         const wrapper = new THREE.Group();

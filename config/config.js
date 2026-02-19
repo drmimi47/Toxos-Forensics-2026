@@ -41,8 +41,8 @@ const CONFIG = {
 
   /* ---- CSV Data ---- */
   csvFiles: {
-    cso:   { path: './data/cso_2263_clipped.csv',   color: 0x667b05, label: 'CSO' },
-    npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xE8820C, label: 'NPDES' }
+    cso:   { path: './data/cso_2263_clipped.csv',   color: 0xA7CE08, label: 'CSO' },
+    npdes: { path: './data/npdes_2263_clipped.csv',  color: 0xFFBF00, label: 'NPDES' }
   },
 
   /* ---- Point marker settings ---- */
@@ -63,7 +63,7 @@ const CONFIG = {
   },
 
   /* ---- Lighting ---- */
-  ambientIntensity: 0.6,
+  ambientIntensity: 0.2,
   directionalIntensity: 0.9,
 
   /* ---- Weather API (future) ---- */

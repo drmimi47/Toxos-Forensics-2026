@@ -9,10 +9,11 @@
  * 6. Fades out the preloader.
  */
 import { createViewer }   from './viewer.js';
-import { loadModel }      from './gltfLoader.js';
+import { loadModel } from './gltfLoader.js';
 import { loadAllCSV }     from './csvLoader.js';
 import { setupTooltips, frameBoundingBox, animateIntro } from './utils.js';
 import { addAllLabels }   from './labels.js';
+
 
 /* ---------- Preloader helpers ---------- */
 const preloaderEl  = document.querySelector('.preloader');
@@ -46,7 +47,7 @@ async function init() {
     // 2. Load the GLB model
     const model = await loadModel(scene, (pct) => {
       setProgress(10 + pct * 0.7, `Loading model… ${Math.round(pct)}%`);
-    });
+    }, renderer);
 
     setProgress(80, 'Framing view…');
 
@@ -82,6 +83,8 @@ async function init() {
 
     // 7. Gentle camera intro animation (pivot down into isometric view)
     animateIntro(camera, controls, 1750);
+
+
   } catch (err) {
     setProgress(100, 'Error – see console');
     console.error('[main] Initialisation failed:', err);
@@ -90,3 +93,5 @@ async function init() {
 }
 
 init();
+
+
