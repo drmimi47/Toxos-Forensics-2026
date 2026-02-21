@@ -82,6 +82,8 @@ export function setupTooltips(camera, scene, tooltipEl) {
     }
   }
 
+  const viewerCanvas = document.querySelector('#viewer-container canvas');
+
   window.addEventListener('pointermove', (event) => {
     pointer.x =  (event.clientX / window.innerWidth)  * 2 - 1;
     pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -91,7 +93,10 @@ export function setupTooltips(camera, scene, tooltipEl) {
 
     const hit = intersects.find(i => i.object.userData?.type);
 
+    const canvas = viewerCanvas;
+
     if (hit) {
+      if (canvas) canvas.style.cursor = 'pointer';
       const d = hit.object.userData;
 
       // Dim / highlight groups when the hovered type changes
@@ -133,6 +138,7 @@ export function setupTooltips(camera, scene, tooltipEl) {
       tooltipEl.style.top  = `${event.clientY + 14}px`;
       tooltipEl.classList.remove('hidden');
     } else {
+      if (canvas) canvas.style.cursor = '';
       if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; }
       if (activeType !== null) resetAllGroups();
       tooltipEl.classList.add('hidden');

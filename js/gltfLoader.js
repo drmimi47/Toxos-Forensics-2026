@@ -226,7 +226,7 @@ export async function loadModel(scene, onProgress) {
 
         // Fixed endpoints for lerping
         const B_LIGHT = new THREE.Color(0x555555);
-        const B_DARK = new THREE.Color(0xffffff);
+        const B_DARK = new THREE.Color(0xeeeeee);
         const S_LIGHT = new THREE.Color(0x444444);
         const S_DARK = new THREE.Color(0xffffff);
 

@@ -5,8 +5,9 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
-
+  /* No z-index: keeps viewer in the body stacking context so that
+     mix-blend-mode on legend text can blend directly against canvas pixels.
+     DOM order (legend comes after viewer-container) keeps UI on top. */
 }
 
 #viewer-container canvas {

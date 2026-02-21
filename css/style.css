@@ -14,12 +14,12 @@
   --accent-dim:    #4d5c04;
   --accent-glow:   rgba(102, 123, 5, 0.25);
   --bg-dark:       #eeeeee;
-  --bg-panel:      rgba(255, 255, 255, 0.9);
+  --bg-panel:      rgba(255, 255, 255, 0.8);
   --bg-panel-solid:#ffffff;
   --border:        rgba(4, 22, 118, 0.10);
   --border-bright: rgba(4, 22, 118, 0.18);
-  --text:          #1a1a2a;
-  --text-dim:      #6b6b7a;
+  --text:          #1a1a1a;
+  --text-dim:      #6b6b6a;
   --scene-image-brightness: 0.60; /* set <1 to darken, >1 to brighten */
   --cso-color:     #00ffff;
   --npdes-color:   #ff3800;
@@ -32,7 +32,7 @@
 /* ===== Dark Mode Tokens ===== */
 body.dark {
   --bg-dark:       #0c0c0c;
-  --bg-panel:      rgba(30, 30, 30, 0.9);
+  --bg-panel:      rgba(30, 30, 30, 0.8);
   --bg-panel-solid:#111111;
   --border:        rgba(255, 255, 255, 0.08);
   --border-bright: rgba(255, 255, 255, 0.15);
@@ -215,9 +215,9 @@ html, body {
   position: absolute;
   bottom: 64px;
   left: 0px;
-  z-index: 10;
   padding: 24px 24px;
   min-width: 190px;
+  background: transparent;
 }
 
 .legend-title {
@@ -226,8 +226,9 @@ html, body {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--text-dim);
+  color: #ffffff;
   margin-bottom: 10px;
+  mix-blend-mode: difference;
 }
 
 .legend-item {
@@ -240,12 +241,17 @@ html, body {
 .legend-label {
   font-size: 0.8rem;
   flex: 1;
+  color: #ffffff;
+  mix-blend-mode: difference;
+  user-select: none;
 }
 
 .legend-count {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--text-dim);
+  color: #ffffff;
+  mix-blend-mode: difference;
+  user-select: none;
 }
 
 .legend-dot {
@@ -273,8 +279,8 @@ html, body {
   position: absolute;
   z-index: 20;
   background: var(--bg-panel);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-bright);
   border-radius: 6px;
   padding: 10px 14px;
@@ -321,8 +327,8 @@ html, body {
   inset: 0;
   z-index: 100;
   background: var(--bg-panel);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
   padding: 60px 48px 48px;
@@ -392,10 +398,10 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 24px 24px;
+  padding: 22px 24px 24px 24px;
   background: var(--bg-panel);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   pointer-events: none;
 }
