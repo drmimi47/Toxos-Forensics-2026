@@ -3,7 +3,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  right: 0;        /* use right instead of width:100% so we can animate it */
   height: 100%;
   /* No z-index: keeps viewer in the body stacking context so that
      mix-blend-mode on legend text can blend directly against canvas pixels.

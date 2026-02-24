@@ -36,6 +36,39 @@ function parseCSV(text) {
  * @param {number} [size=64]  canvas pixel size
  * @returns {THREE.CanvasTexture}
  */
+function createDotTextureSelected(color, size = 64) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const hex = '#' + new THREE.Color(color).getHexString();
+  const half = size / 2;
+  const radius = half * 0.72;
+  const ringW = radius * 0.30;  // ring thickness = 30% of radius
+
+  // Step 1: fill canvas with ring color, punch outer circle shape as alpha mask
+  ctx.fillStyle = hex;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.beginPath();
+  ctx.arc(half, half, radius, 0, Math.PI * 2);
+  ctx.fillStyle = 'black'; // only alpha matters
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Step 2: white fill for the inner circle (creates the ring effect)
+  ctx.beginPath();
+  ctx.arc(half, half, radius - ringW, 0, Math.PI * 2);
+  ctx.fillStyle = 'white';
+  ctx.fill();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function createDotTexture(color, size = 64) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -89,8 +122,9 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
   const text = await response.text();
   const rows = parseCSV(text);
 
-  const lightTex = createDotTexture(color);
-  const darkTex  = createDotTexture(darkColor ?? color);
+  const lightTex    = createDotTexture(color);
+  const darkTex     = createDotTexture(darkColor ?? color);
+  const selectedTex = createDotTextureSelected(color);
 
   const material = new THREE.SpriteMaterial({
     map: lightTex,
@@ -101,6 +135,7 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
     blending: THREE.NormalBlending,
     toneMapped: false,        // bypass ACES tone mapping so colors match the hex exactly
   });
+  material.userData.selectedTex = selectedTex;
 
   const group = new THREE.Group();
   group.name = label;

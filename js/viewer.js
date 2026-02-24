@@ -85,17 +85,91 @@ export function createViewer() {
   scene.add(hemi);
 
   // ---- Resize handler ----
-  window.addEventListener('resize', () => {
+  // Pending renderer dimensions – updated by ResizeObserver every frame of the
+  // CSS transition; consumed inside animate() so the canvas clear + redraw are
+  // atomic and never produce a visible blank frame.
+  let pendingW = 0, pendingH = 0;
+
+  // ---- Panel shift state ----
+  // When the detail card opens we shift + slightly shrink the camera frustum so
+  // the scene re-centres in the visible area and appears a touch smaller.
+  const PANEL_PX         = 404;   // visual width the open card occupies (px)
+  let panelT        = 0;          // 0 = closed, 1 = fully open
+  let panelTarget   = 0;
+  let panelPrevTime = performance.now();
+  let _baseHalfH    = 0;          // camera.top captured after frameBoundingBox
+
+  /**
+   * Shift + scale the orthographic frustum so the scene appears centred in
+   * the remaining visible area and slightly zoomed out when the panel is open.
+   *
+   * Shift derivation: for the world origin to appear at NDC x = –P/W
+   *   left  = –f + shift,  right = f + shift
+   *   NDC(0) = –(right+left)/(right–left) = –shift/f  →  shift = P·f/W ✓
+   */
+  function applyPanelToCamera() {
+    const base = _baseHalfH || camera.top;  // post-framing half-height
     const w = container.clientWidth;
     const h = container.clientHeight;
-    const a = w / h;
-    // Preserve current frustum height, just update aspect
-    const halfH = camera.top;   // current half-height (may have been set by frameBoundingBox)
-    camera.left   = -halfH * a;
-    camera.right  =  halfH * a;
+    if (!w || !h) return;
+    const a     = w / h;
+    const scale = 1 + 0.12 * panelT;       // expand frustum → objects appear smaller
+    const halfH = base * scale;
+    const halfW = halfH * a;
+
+    if (w <= 640) {
+      // Mobile: bottom sheet at 72 vh — shift frustum up so scene centres in top 28 %.
+      // Derivation (analogous to horizontal case):
+      //   NDC_y(origin) = –s / halfH  →  want that = PANEL_FRAC * panelT
+      //   ∴  s = –PANEL_FRAC * panelT * halfH
+      const PANEL_FRAC = 0.72;
+      const s = -(PANEL_FRAC * panelT) * halfH;
+      camera.top    = halfH + s;
+      camera.bottom = -halfH + s;
+      camera.left   = -halfW;
+      camera.right  =  halfW;
+    } else {
+      // Desktop: right card at 404 px — shift frustum right so scene centres in remaining area.
+      const P     = PANEL_PX * panelT;
+      const shift = P * halfW / w;
+      camera.top    =  halfH;
+      camera.bottom = -halfH;
+      camera.left   = -halfW + shift;
+      camera.right  =  halfW + shift;
+    }
     camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
-    labelRenderer.setSize(w, h);
+  }
+
+  function handleResize() {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w === 0 || h === 0) return;
+
+    // Recompute frustum (incorporates current panelT).
+    // Pure math op – no canvas side-effects.
+    applyPanelToCamera();
+
+    // Mark renderer resize pending; animate() will consume this once per frame
+    // right before renderer.render(), so the canvas is never left blank.
+    pendingW = w;
+    pendingH = h;
+  }
+
+  // Fire on true window resize (browser chrome, orientation change, etc.)
+  window.addEventListener('resize', handleResize);
+
+  // Also fire whenever the container itself resizes.
+  new ResizeObserver(handleResize).observe(container);
+
+  // Listen for panel open / close to start the camera animation
+  window.addEventListener('detail-open', () => {
+    if (!_baseHalfH) _baseHalfH = camera.top;  // capture once, post-framing
+    panelTarget = 1;
+    panelPrevTime = performance.now();
+  });
+  window.addEventListener('detail-close', () => {
+    panelTarget = 0;
+    panelPrevTime = performance.now();
   });
 
   // ---- Double-click → smooth top-down view ----
@@ -125,8 +199,10 @@ export function createViewer() {
     controls.enabled = false;
   });
 
-  function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  function easeInOutQuart(t) {
+    return t < 0.5
+      ? 8 * t * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 4) / 2;
   }
 
   // ---- Render loop ----
@@ -137,10 +213,46 @@ export function createViewer() {
   function animate() {
     requestAnimationFrame(animate);
 
+    // Flush any pending renderer resize here – immediately before rendering –
+    // so the canvas clear and the redraw are in the same frame and never visible.
+    if (pendingW > 0) {
+      renderer.setSize(pendingW, pendingH);
+      labelRenderer.setSize(pendingW, pendingH);
+      pendingW = 0;
+      pendingH = 0;
+    }
+
+    // Ease-in-out panel frustum shift
+    {
+      // Animate panelT over a fixed duration
+      const duration = 0.38; // seconds
+      // Store animation start time and initial value
+      if (typeof animate.panelAnim === 'undefined') animate.panelAnim = null;
+      if (panelT !== panelTarget && !animate.panelAnim) {
+        animate.panelAnim = {
+          startT: panelT,
+          endT: panelTarget,
+          startTime: performance.now(),
+        };
+      }
+      if (animate.panelAnim) {
+        const now = performance.now();
+        const t = Math.min((now - animate.panelAnim.startTime) / (duration * 1000), 1);
+        panelT = animate.panelAnim.startT + (animate.panelAnim.endT - animate.panelAnim.startT) * easeInOutQuart(t);
+        applyPanelToCamera();
+        if (t >= 1) {
+          panelT = animate.panelAnim.endT;
+          animate.panelAnim = null;
+        }
+      } else {
+        panelT = panelTarget;
+      }
+    }
+
     if (topDownAnim && !topDownAnim.done) {
       const a = topDownAnim;
       const t = Math.min((performance.now() - a.t0) / a.duration, 1);
-      const e = easeInOutCubic(t);
+      const e = easeInOutQuart(t);
 
       // Slerp quaternion instead of per-frame lookAt → no gimbal-lock jitter
       camera.position.lerpVectors(a.startPos, a.endPos, e);

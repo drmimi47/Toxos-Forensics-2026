@@ -8,54 +8,58 @@
  * 5. Sets up interactive tooltips.
  * 6. Fades out the preloader.
  */
-import * as THREE from 'three';
-import { createViewer }   from './viewer.js';
-import { loadModel } from './gltfLoader.js';
-import { loadAllCSV }     from './csvLoader.js';
-import { setupTooltips, frameBoundingBox, animateIntro } from './utils.js';
-import { addAllLabels, addAllImages }   from './labels.js';
-
+import * as THREE from "three";
+import { createViewer } from "./viewer.js";
+import { loadModel } from "./gltfLoader.js";
+import { loadAllCSV } from "./csvLoader.js";
+import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
+import { closeDetail, getDetailType } from "./detailPanel.js";
+import { addAllLabels, addAllImages } from "./labels.js";
 
 /* ---------- Preloader helpers ---------- */
-const preloaderEl  = document.querySelector('.preloader');
-const preBarEl     = document.getElementById('preloader-bar');
-const preTextEl    = document.getElementById('preloader-text');
+const preloaderEl = document.querySelector(".preloader");
+const preBarEl = document.getElementById("preloader-bar");
+const preTextEl = document.getElementById("preloader-text");
 
 function setProgress(pct, label) {
-  if (preBarEl)  preBarEl.style.width = `${Math.min(pct, 100)}%`;
+  if (preBarEl) preBarEl.style.width = `${Math.min(pct, 100)}%`;
   if (preTextEl) preTextEl.textContent = label;
 }
 
 function hidePreloader() {
-  setProgress(100, 'Complete');
+  setProgress(100, "Complete");
   // Small delay so user can see 100%
   setTimeout(() => {
-    preloaderEl?.classList.add('done');
+    preloaderEl?.classList.add("done");
   }, 400);
 }
 
 /* ---------- Boot ---------- */
 async function init() {
-  setProgress(5, 'Setting up scene');
+  setProgress(5, "Setting up scene");
 
   // 1. Spin up the 3D viewer
   const { scene, camera, renderer, controls, setTickSprites } = createViewer();
-  const tooltipEl = document.getElementById('tooltip');
+  const tooltipEl = document.getElementById("tooltip");
 
   try {
-    setProgress(10, 'Loading 3D model');
+    setProgress(10, "Loading 3D model");
 
     // 2. Load the GLB model
-    const { model, setModeProgress } = await loadModel(scene, (pct) => {
-      setProgress(10 + pct * 0.7, `Loading model ${Math.round(pct)}%`);
-    }, renderer);
+    const { model, setModeProgress } = await loadModel(
+      scene,
+      (pct) => {
+        setProgress(10 + pct * 0.7, `Loading model ${Math.round(pct)}%`);
+      },
+      renderer,
+    );
 
-    setProgress(80, 'Framing view');
+    setProgress(80, "Framing view");
 
     // 3. Auto-frame the camera around the loaded model
     frameBoundingBox(model, camera, controls);
 
-    setProgress(85, 'Loading data overlays');
+    setProgress(85, "Loading data overlays");
 
     // 4. Overlay CSV data points
     const csvResults = await loadAllCSV(scene);
@@ -66,44 +70,54 @@ async function init() {
 
     // Update legend counts
     if (csvResults.cso) {
-      const el = document.getElementById('count-cso');
+      const el = document.getElementById("count-cso");
       if (el) el.textContent = csvResults.cso.group.children.length;
     }
     if (csvResults.npdes) {
-      const el = document.getElementById('count-npdes');
+      const el = document.getElementById("count-npdes");
       if (el) el.textContent = csvResults.npdes.group.children.length;
     }
     if (csvResults.rcra_2263_clipped) {
-      const el = document.getElementById('count-rcra');
-      if (el) el.textContent = csvResults.rcra_2263_clipped.group.children.length;
+      const el = document.getElementById("count-rcra");
+      if (el)
+        el.textContent = csvResults.rcra_2263_clipped.group.children.length;
     }
 
-
-    setProgress(95, 'Preparing interactions…');
+    setProgress(95, "Preparing interactions…");
 
     // --- Legend click interaction to toggle dataset visibility ---
     // Map legend dot class to csvResults key
     const legendMap = {
-      cso: 'cso',
-      npdes: 'npdes',
-      rcra: 'rcra_2263_clipped'
+      cso: "cso",
+      npdes: "npdes",
+      rcra: "rcra_2263_clipped",
     };
     Object.entries(legendMap).forEach(([dotClass, csvKey]) => {
-      const dot = document.querySelector('.legend-dot.' + dotClass);
+      const dot = document.querySelector(".legend-dot." + dotClass);
       if (!dot) return;
-      dot.style.cursor = 'pointer';
-      dot.setAttribute('tabindex', '0');
-      dot.setAttribute('title', 'Toggle visibility');
+      const item = dot.closest(".legend-item");
+      if (!item) return;
+
+      item.style.cursor = "pointer";
+      item.setAttribute("tabindex", "0");
+      item.setAttribute("title", "Toggle visibility");
       let visible = true;
-      dot.addEventListener('click', () => {
+
+      item.addEventListener("click", () => {
         visible = !visible;
         const group = csvResults[csvKey]?.group;
         if (group) group.visible = visible;
-        dot.style.opacity = visible ? '1' : '0.35';
+        item.classList.toggle("disabled", !visible);
+        // Close the detail card if it's showing a point from this dataset
+        if (!visible && new RegExp(dotClass, "i").test(getDetailType())) {
+          closeDetail();
+        }
       });
-      dot.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          dot.click();
+
+      item.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          item.click();
         }
       });
     });
@@ -117,10 +131,10 @@ async function init() {
 
     // Dark mode — smooth crossfade via RAF lerp
     const BG_LIGHT = new THREE.Color(0xeeeeee);
-    const BG_DARK  = new THREE.Color(0x111111);
-    let modeT      = 0;   // current interpolation value (0=light, 1=dark)
-    let modeTarget = 0;   // where we're animating towards
-    let modeRafId  = null;
+    const BG_DARK = new THREE.Color(0x111111);
+    let modeT = 0; // current interpolation value (0=light, 1=dark)
+    let modeTarget = 0; // where we're animating towards
+    let modeRafId = null;
     let modePrevTime = performance.now();
 
     function tickModeFrame(now) {
@@ -128,18 +142,22 @@ async function init() {
       modePrevTime = now;
 
       if (modeTarget > modeT) modeT = Math.min(modeT + dt, modeTarget);
-      else                     modeT = Math.max(modeT - dt, modeTarget);
+      else modeT = Math.max(modeT - dt, modeTarget);
 
       // Toggle CSS class at midpoint so @property transitions meet symmetrically
-      if (modeTarget === 1 && modeT >= 0.5) document.body.classList.add('dark');
-      if (modeTarget === 0 && modeT <= 0.5) document.body.classList.remove('dark');
+      if (modeTarget === 1 && modeT >= 0.5) document.body.classList.add("dark");
+      if (modeTarget === 0 && modeT <= 0.5)
+        document.body.classList.remove("dark");
 
       // Swap marker dot textures at the midpoint
       const isDarkNow = modeT >= 0.5;
       for (const result of Object.values(csvResults)) {
         if (!result?.material) continue;
         const tex = isDarkNow ? result.darkTex : result.lightTex;
-        if (result.material.map !== tex) { result.material.map = tex; result.material.needsUpdate = true; }
+        if (result.material.map !== tex) {
+          result.material.map = tex;
+          result.material.needsUpdate = true;
+        }
       }
 
       setModeProgress(modeT);
@@ -154,24 +172,20 @@ async function init() {
       }
     }
 
-    document.getElementById('dark-mode-btn')?.addEventListener('click', () => {
+    document.getElementById("dark-mode-btn")?.addEventListener("click", () => {
       if (modeRafId) return; // ignore while animating
-      modeTarget     = modeT < 0.5 ? 1 : 0;
-      modePrevTime   = performance.now();
-      modeRafId      = requestAnimationFrame(tickModeFrame);
+      modeTarget = modeT < 0.5 ? 1 : 0;
+      modePrevTime = performance.now();
+      modeRafId = requestAnimationFrame(tickModeFrame);
     });
 
     // 7. Gentle camera intro animation (pivot down into isometric view)
     animateIntro(camera, controls, 1750);
-
-
   } catch (err) {
-    setProgress(100, 'Error – see console');
-    console.error('[main] Initialisation failed:', err);
-    setTimeout(() => preloaderEl?.classList.add('done'), 2000);
+    setProgress(100, "Error – see console");
+    console.error("[main] Initialisation failed:", err);
+    setTimeout(() => preloaderEl?.classList.add("done"), 2000);
   }
 }
 
 init();
-
-

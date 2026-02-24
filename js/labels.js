@@ -5,7 +5,7 @@
  * but is rendered as a DOM element (resolution-independent, always readable).
  */
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { openDetail } from './detailPanel.js';
+import { openDetail, isDetailOpen } from './detailPanel.js';
 
 /**
  * Create a CSS2D label and add it to the scene.
@@ -73,6 +73,7 @@ export function addImage(scene, id, src, x, y, z, opts = {}) {
 
   // Open the detail overlay on click/tap — show a frosted overlay with the image
   img.addEventListener('pointerdown', (e) => {
+    if (isDetailOpen()) return;
     e.stopPropagation();
     e.preventDefault();
     // Use a simple title and pass the image src to the detail panel
