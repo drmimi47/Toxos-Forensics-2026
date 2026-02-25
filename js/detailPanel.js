@@ -1,17 +1,13 @@
 /**
- * detailPanel.js – Right-side dataset detail card.
+ * detailPanel.js – Multi-panel detail card system.
  *
- * Opens a card panel on the right side of the screen when a data-point
- * sprite is clicked. The 3D viewer transitions to fill the remaining
- * space. Left/right arrows navigate between all points in the same
- * dataset. Keyboard arrows and Escape also work.
- *
- * openDetail(payload) accepts:
- *   - a string  → dataset type key (legacy / history fallback)
- *   - an object → { type, sprite, group: Sprite[], index }
+ * One independent panel per dataset type (CSO / NPDES / RCRA) or per image.
+ * Panels are created on first open and reused (shown/hidden) thereafter.
+ * Clicking a point from a different dataset opens a second panel alongside
+ * the existing one, stacked slightly offset so both are visible.
  */
 
-/* ---------- Per-dataset content (extend for new datasets) ---------- */
+/* ---------- Per-dataset content ---------- */
 const DATASET_CONTENT = {
   CSO: {
     title: 'Combined Sewer Overflow (CSO)',
@@ -41,21 +37,6 @@ const DATASET_CONTENT = {
     title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
     body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum erat, nec dictum urna erat nec erat.`,
     image: './assets/images/rcra.jpg'
-  },
-  'Regulated Hazardous Waste Management Facilities (RCRA)': {
-    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
-    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum erat, nec dictum urna erat nec erat.`,
-    image: './assets/images/rcra.jpg'
-  },
-  RCRA_2263_CLIPPED: {
-    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
-    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum erat, nec dictum urna erat nec erat.`,
-    image: './assets/images/rcra.jpg'
-  },
-  rcra_2263_clipped: {
-    title: 'Regulated Hazardous Waste Management Facilities (RCRA)',
-    body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis, urna at cursus dictum, nisi erat dictum urna erat nec erat.`,
-    image: './assets/images/rcra.jpg'
   }
 };
 
@@ -63,301 +44,410 @@ function fallbackContent(type) {
   return { title: type, body: `Details for the ${type} dataset will appear here.` };
 }
 
-// Make closeDetail globally accessible for utils.js
-window.closeDetail = closeDetail;
+/* ---------- Type helpers ---------- */
 
-/* ---------- Type → accent color ---------- */
+/** Normalise any RCRA / CSO / NPDES variant to a canonical key used for panel lookup. */
+function normalizeKey(type) {
+  const t = String(type).toLowerCase();
+  if (t.includes('rcra'))  return 'RCRA';
+  if (t.includes('cso'))   return 'CSO';
+  if (t.includes('npdes')) return 'NPDES';
+  return type; // image labels or unknowns keep their title as key
+}
+
 function typeColor(type) {
   const t = String(type).toLowerCase();
-  if (t.includes('cso')) return 'var(--cso-color)';
+  if (t.includes('cso'))   return 'var(--cso-color)';
   if (t.includes('npdes')) return 'var(--npdes-color)';
-  if (t.includes('rcra')) return 'var(--rcra-color)';
+  if (t.includes('rcra'))  return 'var(--rcra-color)';
   return 'var(--accent)';
 }
 
-/* ---------- DOM refs ---------- */
-let panel, titleEl, bodyEl, metaEl, imageWrap, badgeEl;
-let prevBtn, nextBtn, counterEl, closeBtn;
-let scrollEl;
-let domReady = false;
-let isOpen = false;
-let closedAt = 0;
+/* ---------- SVG icon strings ---------- */
+const SVG_PREV  = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L6 8l4 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SVG_NEXT  = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l4 5-4 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SVG_CLOSE = `<svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
-/* ---------- Navigation state ---------- */
-let currentGroup = [];   // flat array of sprites in the active dataset
-let currentIndex = 0;
+/* ---------- Global panel registry ---------- */
+const panelMap   = new Map();  // normalizedKey → PanelInstance
+let openCount    = 0;
+let lastClosedAt = 0;
+let lastActiveKey = null;
+let openOrderCounter = 0;  // resets to 0 whenever all panels close
 
-function ensureDOM() {
-  if (domReady) return;
-  panel = document.getElementById('detail-panel');
-  titleEl = document.getElementById('detail-title');
-  bodyEl = document.getElementById('detail-body');
-  metaEl = document.getElementById('detail-meta');
-  imageWrap = document.getElementById('dp-image-wrap');
-  badgeEl = document.getElementById('dp-type-badge');
-  prevBtn = document.getElementById('detail-prev');
-  nextBtn = document.getElementById('detail-next');
-  counterEl = document.getElementById('dp-counter');
-  closeBtn = document.getElementById('detail-close');
-  scrollEl = panel?.querySelector('.dp-scroll');
-  domReady = true;
-}
+const STACK_OFFSET = 28;  // px of additional top offset per stacked panel
 
-/* ---------- Content rendering ---------- */
+/* ============================================================
+   PanelInstance – one panel card per dataset type / image
+   ============================================================ */
+class PanelInstance {
+  constructor(key) {
+    this.key           = key;
+    this.displayOrder  = -1;  // assigned fresh on each open(), cleared on close()
+    this.isOpen        = false;
+    this.dragTransform = '';
+    this.currentGroup  = [];
+    this.currentIndex  = 0;
 
-function fillContent(content, userData, type) {
-  if (titleEl) titleEl.textContent = content.title || '';
-  if (bodyEl) bodyEl.textContent = content.body || '';
+    /* ---- Build DOM ---- */
+    this.el = document.createElement('div');
+    this.el.className = 'detail-panel hidden';
+    this.el.setAttribute('aria-hidden', 'true');
+    // Position is set dynamically in open() based on current session order
+    this.el.style.top    = '12px';
+    this.el.style.zIndex = '100';
+    this.el.innerHTML = `
+      <div class="dp-header dp-draggable" style="cursor:grab">
+        <div class="dp-nav">
+          <button class="dp-nav-btn dp-prev" aria-label="Previous point">${SVG_PREV}</button>
+          <span class="dp-counter"></span>
+          <button class="dp-nav-btn dp-next" aria-label="Next point">${SVG_NEXT}</button>
+        </div>
+        <button class="dp-close-btn" aria-label="Close panel">${SVG_CLOSE}</button>
+      </div>
+      <div class="dp-scroll">
+        <div class="dp-type-badge"></div>
+        <h2 class="detail-title"></h2>
+        <div class="detail-meta"></div>
+        <div class="dp-image-wrap"></div>
+        <p class="detail-body"></p>
+      </div>`;
+    document.body.appendChild(this.el);
 
-  // Type badge with colored dot
-  if (badgeEl) {
-    const color = typeColor(type);
-    badgeEl.innerHTML =
-      `<span class="dp-type-dot" style="background:${color}"></span>${type}`;
+    /* ---- Cache child refs ---- */
+    this.dragHeader = this.el.querySelector('.dp-draggable');
+    this.counterEl  = this.el.querySelector('.dp-counter');
+    this.prevBtn    = this.el.querySelector('.dp-prev');
+    this.nextBtn    = this.el.querySelector('.dp-next');
+    this.closeBtn   = this.el.querySelector('.dp-close-btn');
+    this.scrollEl   = this.el.querySelector('.dp-scroll');
+    this.badgeEl    = this.el.querySelector('.dp-type-badge');
+    this.titleEl    = this.el.querySelector('.detail-title');
+    this.metaEl     = this.el.querySelector('.detail-meta');
+    this.imageWrap  = this.el.querySelector('.dp-image-wrap');
+    this.bodyEl     = this.el.querySelector('.detail-body');
+
+    this._wireEvents();
   }
 
-  // Per-point metadata grid
-  if (metaEl) {
-    const d = userData || {};
-    const rows = [];
-    if (d.handle) rows.push(
-      `<span class="dp-meta-label">Handle</span>` +
-      `<span class="dp-meta-value">${d.handle}</span>`
-    );
-    if (d.text) rows.push(
-      `<span class="dp-meta-label">ID</span>` +
-      `<span class="dp-meta-value">${d.text}</span>`
-    );
-    if (d.coordX != null) rows.push(
-      `<span class="dp-meta-label">Easting</span>` +
-      `<span class="dp-meta-value">${Number(d.coordX).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>`
-    );
-    if (d.coordY != null) rows.push(
-      `<span class="dp-meta-label">Northing</span>` +
-      `<span class="dp-meta-value">${Number(d.coordY).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>`
-    );
-    metaEl.innerHTML = rows.length
-      ? `<div class="dp-meta-grid">${rows.join('')}</div>`
-      : '';
+  /* ---- Event wiring ---- */
+  _wireEvents() {
+    this.closeBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      this.close();
+      history.replaceState(null, '', window.location.pathname);
+    });
+
+    this.prevBtn.addEventListener('click', () => {
+      if (!this.currentGroup.length) return;
+      this.currentIndex = (this.currentIndex - 1 + this.currentGroup.length) % this.currentGroup.length;
+      this.renderPoint(true);
+    });
+
+    this.nextBtn.addEventListener('click', () => {
+      if (!this.currentGroup.length) return;
+      this.currentIndex = (this.currentIndex + 1) % this.currentGroup.length;
+      this.renderPoint(true);
+    });
+
+    this._enableDrag();
   }
 
-  // Image
-  if (imageWrap) {
-    imageWrap.innerHTML = '';
-    if (content.image) {
-      const img = document.createElement('img');
-      img.className = 'detail-panel-image';
-      img.src = content.image;
-      img.alt = content.title || '';
-      img.loading = 'eager';
-      imageWrap.appendChild(img);
+  _enableDrag() {
+    let dragging = false;
+    let ds = { x: 0, y: 0 };
+    let ps = { x: 0, y: 0 };
+
+    this.dragHeader.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      this.dragHeader.style.cursor = 'grabbing';
+      ds.x = e.clientX;
+      ds.y = e.clientY;
+      const m = this.dragTransform.match(/translate\(([^,]+),\s*([^)]+)\)/);
+      ps.x = m ? parseFloat(m[1]) : 0;
+      ps.y = m ? parseFloat(m[2]) : 0;
+      document.body.style.userSelect = 'none';
+      this._bringToFront();
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - ds.x;
+      const dy = e.clientY - ds.y;
+      this.el.style.transition = 'none';
+      this.dragTransform = `translate(${ps.x + dx}px, ${ps.y + dy}px)`;
+      this.el.style.transform = this.dragTransform;
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (!dragging) return;
+      dragging = false;
+      this.dragHeader.style.cursor = 'grab';
+      document.body.style.userSelect = '';
+      this.el.style.transition = '';  // restore CSS transitions after drag
+    });
+  }
+
+  _bringToFront() {
+    let maxZ = 99;
+    panelMap.forEach(p => {
+      const z = parseInt(p.el.style.zIndex || '100', 10);
+      if (z > maxZ) maxZ = z;
+    });
+    this.el.style.zIndex = String(maxZ + 1);
+  }
+
+  /* ---- Open / close ---- */
+  open(group, index) {
+    this.currentGroup = group;
+    this.currentIndex = index;
+
+    if (this.isOpen) {
+      // Already visible – swap content and bring to front
+      this.renderPoint(true);
+      this._bringToFront();
+      return;
+    }
+
+    this.renderPoint(false);
+
+    // Assign stacking order for this session and update top position
+    this.displayOrder = openOrderCounter++;
+    this.el.style.top = `${12 + this.displayOrder * STACK_OFFSET}px`;
+
+    // Apply saved drag position (empty string = CSS handles slide-in from right)
+    this.el.style.transform = this.dragTransform || '';
+    this.el.classList.remove('hidden');
+    this.el.setAttribute('aria-hidden', 'false');
+    // Double rAF so the browser paints one opacity:0 frame before adding .visible
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      this.el.classList.add('visible');
+    }));
+
+    this.isOpen = true;
+    openCount++;
+
+    if (openCount === 1) {
+      document.body.classList.add('panel-open');
+      window.dispatchEvent(new CustomEvent('detail-open'));
+    }
+
+    this._bringToFront();
+  }
+
+  close() {
+    if (!this.isOpen) return;
+
+    this.el.classList.remove('visible');
+    this.el.setAttribute('aria-hidden', 'true');
+    // Reset position so next open always slides in fresh from the right
+    this.el.style.transform = '';
+    this.dragTransform = '';
+    this.isOpen = false;
+    this.displayOrder = -1;  // release this panel's slot
+    openCount = Math.max(0, openCount - 1);
+    lastClosedAt = performance.now();
+
+    // Fire detail-close with remaining panel count so viewer.js only
+    // unshifts the camera frustum when the very last panel is gone.
+    window.dispatchEvent(new CustomEvent('detail-close', { detail: { panelCount: openCount } }));
+
+    if (openCount === 0) {
+      openOrderCounter = 0;  // reset stacking counter so next open starts fresh
+      document.body.classList.remove('panel-open');
+    } else {
+      // Re-apply sprite selection for whichever panel is still open,
+      // since detail-close causes utils.js to clear all selections.
+      panelMap.forEach(p => {
+        if (p !== this && p.isOpen) {
+          const s = p.currentGroup[p.currentIndex];
+          if (s?.isSprite || s?.isMesh) {
+            window.dispatchEvent(new CustomEvent('detail-navigate', { detail: { sprite: s } }));
+          }
+        }
+      });
+    }
+
+    setTimeout(() => { if (!this.isOpen) this.el.classList.add('hidden'); }, 580);
+  }
+
+  /* ---- Content rendering ---- */
+  fillContent(content, userData, type) {
+    if (this.titleEl) this.titleEl.textContent = content.title || '';
+    if (this.bodyEl)  this.bodyEl.textContent  = content.body  || '';
+
+    if (this.badgeEl) {
+      const color = typeColor(type);
+      this.badgeEl.innerHTML = `<span class="dp-type-dot" style="background:${color}"></span>${type}`;
+    }
+
+    if (this.metaEl) {
+      const d = userData || {};
+      const rows = [];
+      if (d.handle)     rows.push(`<span class="dp-meta-label">Handle</span><span class="dp-meta-value">${d.handle}</span>`);
+      if (d.text)       rows.push(`<span class="dp-meta-label">ID</span><span class="dp-meta-value">${d.text}</span>`);
+      if (d.coordX != null) rows.push(`<span class="dp-meta-label">Easting</span><span class="dp-meta-value">${Number(d.coordX).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>`);
+      if (d.coordY != null) rows.push(`<span class="dp-meta-label">Northing</span><span class="dp-meta-value">${Number(d.coordY).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>`);
+      this.metaEl.innerHTML = rows.length ? `<div class="dp-meta-grid">${rows.join('')}</div>` : '';
+    }
+
+    if (this.imageWrap) {
+      this.imageWrap.innerHTML = '';
+      if (content.image) {
+        const img = document.createElement('img');
+        img.className = 'detail-panel-image';
+        img.src = content.image;
+        img.alt = content.title || '';
+        img.loading = 'eager';
+        this.imageWrap.appendChild(img);
+      }
+    }
+  }
+
+  renderPoint(animate) {
+    const sprite  = this.currentGroup[this.currentIndex];
+    const d       = sprite?.userData || {};
+    const type    = d.type || this.key;
+    const content = d._direct || DATASET_CONTENT[normalizeKey(type)] || fallbackContent(type);
+
+    if (this.counterEl) {
+      this.counterEl.textContent = this.currentGroup.length > 1
+        ? `${this.currentIndex + 1} / ${this.currentGroup.length}`
+        : '';
+    }
+
+    if (this.prevBtn) this.prevBtn.disabled = this.currentGroup.length <= 1;
+    if (this.nextBtn) this.nextBtn.disabled = this.currentGroup.length <= 1;
+
+    // Notify utils.js so the correct 3D sprite gets highlighted
+    const s = this.currentGroup[this.currentIndex];
+    if (s?.isSprite || s?.isMesh) {
+      window.dispatchEvent(new CustomEvent('detail-navigate', { detail: { sprite: s } }));
+    }
+
+    if (animate && this.scrollEl) {
+      this.scrollEl.style.transition = 'opacity 0.1s ease, transform 0.12s ease, filter 0.1s ease';
+      this.scrollEl.style.opacity    = '0';
+      this.scrollEl.style.transform  = 'translateY(7px)';
+      this.scrollEl.style.filter     = 'blur(4px)';
+      setTimeout(() => {
+        this.fillContent(content, d, type);
+        if (this.scrollEl) this.scrollEl.scrollTop = 0;
+        this.scrollEl.style.transition = 'opacity 0.38s cubic-bezier(0.2,0.8,0.3,1), transform 0.38s cubic-bezier(0.2,0.8,0.3,1), filter 0.32s ease';
+        this.scrollEl.style.opacity    = '1';
+        this.scrollEl.style.transform  = 'translateY(0)';
+        this.scrollEl.style.filter     = 'blur(0px)';
+      }, 115);
+    } else {
+      this.fillContent(content, d, type);
+      if (this.scrollEl) {
+        this.scrollEl.style.transition = '';
+        this.scrollEl.style.opacity    = '1';
+        this.scrollEl.style.transform  = 'translateY(0)';
+        this.scrollEl.style.filter     = 'blur(0px)';
+      }
     }
   }
 }
 
-/**
- * Render the current datapoint. Pass animate=true when navigating
- * between points to cross-fade the content.
- */
-function renderPoint(animate) {
-  const sprite = currentGroup[currentIndex];
-  const d = sprite?.userData || {};
-  const type = d.type || '';
-  const content = d._direct || DATASET_CONTENT[type] || fallbackContent(type);
+/* ---------- Panel registry helpers ---------- */
 
-  // Update counter
-  if (counterEl) {
-    counterEl.textContent = currentGroup.length > 1
-      ? `${currentIndex + 1} / ${currentGroup.length}`
-      : '';
-  }
-
-  // Disable nav arrows when there's only one point
-  if (prevBtn) prevBtn.disabled = currentGroup.length <= 1;
-  if (nextBtn) nextBtn.disabled = currentGroup.length <= 1;
-
-  // Notify utils.js which sprite is now the selected one so it can apply
-  // per-sprite dimming on the 3D scene.
-  const currentSprite = currentGroup[currentIndex];
-  if (currentSprite?.isSprite || currentSprite?.isMesh) {
-    window.dispatchEvent(new CustomEvent('detail-navigate', { detail: { sprite: currentSprite } }));
-  }
-
-  if (animate && scrollEl) {
-    // Quick fade out
-    scrollEl.style.transition = 'opacity 0.1s ease, transform 0.12s ease, filter 0.1s ease';
-    scrollEl.style.opacity = '0';
-    scrollEl.style.transform = 'translateY(7px)';
-    scrollEl.style.filter = 'blur(4px)';
-
-    setTimeout(() => {
-      fillContent(content, d, type);
-      // Scroll content back to top for new point
-      if (scrollEl) scrollEl.scrollTop = 0;
-      // Smooth fade in
-      scrollEl.style.transition = 'opacity 0.38s cubic-bezier(0.2,0.8,0.3,1), transform 0.38s cubic-bezier(0.2,0.8,0.3,1), filter 0.32s ease';
-      scrollEl.style.opacity = '1';
-      scrollEl.style.transform = 'translateY(0)';
-      scrollEl.style.filter = 'blur(0px)';
-    }, 115);
-  } else {
-    fillContent(content, d, type);
-    if (scrollEl) {
-      scrollEl.style.transition = '';
-      scrollEl.style.opacity = '1';
-      scrollEl.style.transform = 'translateY(0)';
-      scrollEl.style.filter = 'blur(0px)';
-    }
-  }
+function getOrCreate(key) {
+  if (!panelMap.has(key)) panelMap.set(key, new PanelInstance(key));
+  return panelMap.get(key);
 }
 
-/* ---------- Wire UI events after DOM ready ---------- */
+/* ---------- Document-level listeners ---------- */
 
-document.addEventListener('DOMContentLoaded', () => {
-  ensureDOM();
-
-  closeBtn?.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    closeDetail();
-    history.replaceState(null, '', window.location.pathname);
-  });
-
-  prevBtn?.addEventListener('click', () => {
-    if (!currentGroup.length) return;
-    currentIndex = (currentIndex - 1 + currentGroup.length) % currentGroup.length;
-    renderPoint(true);
-  });
-
-  nextBtn?.addEventListener('click', () => {
-    if (!currentGroup.length) return;
-    currentIndex = (currentIndex + 1) % currentGroup.length;
-    renderPoint(true);
-  });
-});
-
-/* Click outside panel + outside model → close */
-document.addEventListener('pointerdown', (e) => {
-  if (!isOpen) return;
-  if (e.target.closest('#detail-panel')) return;
-  if (e.target.closest('#viewer-container')) return;
-  closeDetail();
-});
-
-/* Keyboard: ← → navigate, Escape closes */
+// Keyboard: arrows navigate, Escape closes all open panels
 window.addEventListener('keydown', (e) => {
-  if (!isOpen) return;
+  if (openCount === 0) return;
+
   if (e.key === 'Escape') {
-    closeDetail();
+    panelMap.forEach(p => { if (p.isOpen) p.close(); });
     history.replaceState(null, '', window.location.pathname);
-  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    if (currentGroup.length > 1) {
-      currentIndex = (currentIndex - 1 + currentGroup.length) % currentGroup.length;
-      renderPoint(true);
-    }
-  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-    if (currentGroup.length > 1) {
-      currentIndex = (currentIndex + 1) % currentGroup.length;
-      renderPoint(true);
+  } else {
+    const p = lastActiveKey ? panelMap.get(lastActiveKey) : null;
+    if (!p?.isOpen) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      if (p.currentGroup.length > 1) {
+        p.currentIndex = (p.currentIndex - 1 + p.currentGroup.length) % p.currentGroup.length;
+        p.renderPoint(true);
+      }
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      if (p.currentGroup.length > 1) {
+        p.currentIndex = (p.currentIndex + 1) % p.currentGroup.length;
+        p.renderPoint(true);
+      }
     }
   }
 });
 
-/* ---------- Open / close ---------- */
+/* ---------- Exported API (same surface as before) ---------- */
 
 export function openDetail(payload) {
-  ensureDOM();
-
   let type, group, index;
 
   if (typeof payload === 'string') {
-    // Legacy / history-restore path
-    type = payload;
+    type  = payload;
     group = [{ userData: { type } }];
     index = 0;
   } else if (payload.title || payload.image) {
-    // Direct content from scene-image labels (labels.js) – no type lookup needed
-    type = payload.title || 'Image';
+    // Direct content from scene-image labels (labels.js)
+    type  = payload.title || 'Image';
     group = [{ userData: { type, _direct: { title: payload.title, body: payload.body, image: payload.image } } }];
     index = 0;
   } else {
-    type = payload.type;
+    type  = payload.type;
     group = payload.group || [payload.sprite || { userData: { type } }];
     index = payload.index ?? 0;
   }
 
-  currentGroup = group;
-  currentIndex = index;
-
-  if (isOpen) {
-    // Panel already open – just swap content with a cross-fade
-    renderPoint(true);
-    return;
-  }
-
-  // First render (no animation yet – panel still invisible)
-  renderPoint(false);
-
-  // Un-hide from display:none, then double-rAF so the browser paints
-  // one frame with opacity:0 before adding .visible (triggers CSS transition)
-  panel.classList.remove('hidden');
-  panel.setAttribute('aria-hidden', 'false');
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      panel.classList.add('visible');
-    });
-  });
-
-  document.body.classList.add('panel-open');
-  isOpen = true;
-  window.dispatchEvent(new CustomEvent('detail-open'));
+  const key   = normalizeKey(type);
+  const panel = getOrCreate(key);
+  lastActiveKey = key;
+  panel.open(group, index);
 
   const histType = type || 'detail';
-  history.pushState(
-    { detailPanel: true, type: histType },
-    '',
-    `#${String(histType).toLowerCase()}`
-  );
+  history.pushState({ detailPanel: true, type: histType }, '', `#${String(histType).toLowerCase()}`);
 }
 
 export function closeDetail() {
-  ensureDOM();
-  if (!isOpen) return;
-
-  panel.classList.remove('visible');
-  document.body.classList.remove('panel-open');
-  panel.setAttribute('aria-hidden', 'true');
-  isOpen = false;
-  closedAt = performance.now();
-
-  // Tell utils.js to clear the selected sprite and restore all opacities
-  window.dispatchEvent(new CustomEvent('detail-close'));
-
-  // After the CSS transition finishes, re-apply display:none
-  setTimeout(() => {
-    if (!isOpen) panel.classList.add('hidden');
-  }, 580);
+  // Close the last-active panel (called imperatively from utils.js / main.js)
+  if (lastActiveKey) {
+    const p = panelMap.get(lastActiveKey);
+    if (p?.isOpen) { p.close(); return; }
+  }
+  // Fallback: close first open panel found
+  for (const p of panelMap.values()) {
+    if (p.isOpen) { p.close(); return; }
+  }
 }
 
-export function isDetailOpen() { return isOpen; }
+export function isDetailOpen()  { return openCount > 0; }
 
-/** Returns the dataset type key of the currently-open card, or null. */
 export function getDetailType() {
-  if (!isOpen) return null;
-  return currentGroup[currentIndex]?.userData?.type ?? null;
+  if (!lastActiveKey) return null;
+  const p = panelMap.get(lastActiveKey);
+  if (!p?.isOpen) return null;
+  return p.currentGroup[p.currentIndex]?.userData?.type ?? null;
 }
 
-/** Returns true if the panel was closed very recently (within ms). */
 export function justClosed(ms = 300) {
-  return (performance.now() - closedAt) < ms;
+  return (performance.now() - lastClosedAt) < ms;
 }
+
+// Expose globally so utils.js can call it imperatively
+window.closeDetail = closeDetail;
 
 /* ---------- Browser back / forward ---------- */
 window.addEventListener('popstate', (e) => {
-  if (isOpen && !e.state?.detailPanel) {
-    closeDetail();
-  } else if (!isOpen && e.state?.detailPanel) {
+  if (openCount > 0 && !e.state?.detailPanel) {
+    panelMap.forEach(p => { if (p.isOpen) p.close(); });
+  } else if (openCount === 0 && e.state?.detailPanel) {
     openDetail(e.state.type);
   }
 });

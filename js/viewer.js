@@ -61,8 +61,8 @@ export function createViewer() {
   controls.zoomSpeed = 1.2;
   controls.enableZoom = true;
   // For ortho cameras OrbitControls zooms by scaling the frustum
-  controls.minZoom = 0.1;
-  controls.maxZoom = 10;
+  controls.minZoom = 0.50;
+  controls.maxZoom = 25;
   controls.maxPolarAngle = Math.PI / 2.05;
 
   // ---- Lights ----
@@ -167,35 +167,63 @@ export function createViewer() {
     panelTarget = 1;
     panelPrevTime = performance.now();
   });
-  window.addEventListener('detail-close', () => {
-    panelTarget = 0;
-    panelPrevTime = performance.now();
+  window.addEventListener('detail-close', (e) => {
+    // Only unshift the camera when the very last panel has closed.
+    // With multi-panel, intermediate closes carry panelCount > 0.
+    if ((e.detail?.panelCount ?? 0) === 0) {
+      panelTarget = 0;
+      panelPrevTime = performance.now();
+    }
   });
 
-  // ---- Double-click → smooth top-down view ----
+  // ---- Double-click → toggle between top-down and isometric home view ----
   let topDownAnim = null;
+  let homeState = null;
+
+  /** Store the post-framing isometric camera state so we can return to it. */
+  function setHomeState(pos, target) {
+    homeState = { pos: pos.clone(), target: target.clone() };
+  }
 
   renderer.domElement.addEventListener('dblclick', () => {
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
 
-    // Tiny Z offset avoids gimbal-lock singularity when OrbitControls resumes
-    const endPos = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
-    const startPos = camera.position.clone();
-    const startQuat = camera.quaternion.clone();
-
-    // Build a deterministic top-down quaternion from a fresh lookAt matrix.
-    // Using an explicit up vector (negative Z = "north" on screen) avoids
-    // inheriting any quirky orientation from the current camera state.
-    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 0, -1));
-    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    // Detect if camera is already in top-down view:
+    // when near-vertical, the XZ offset from the target is a tiny fraction of dist.
+    const toCamera = camera.position.clone().sub(target);
+    const xzLen = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
+    const isTopDown = xzLen / dist < 0.08;
 
     if (topDownAnim) topDownAnim.done = true;
 
-    topDownAnim = {
-      startPos, endPos, startQuat, endQuat, target,
-      t0: performance.now(), duration: 800, done: false
-    };
+    if (isTopDown && homeState) {
+      // Already top-down → animate back to isometric home
+      const endPos = homeState.pos.clone();
+      const homeTarget = homeState.target.clone();
+      const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, homeTarget, new THREE.Vector3(0, 1, 0));
+      const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+
+      topDownAnim = {
+        startPos: camera.position.clone(), endPos,
+        startQuat: camera.quaternion.clone(), endQuat,
+        target: homeTarget,
+        t0: performance.now(), duration: 800, done: false
+      };
+    } else {
+      // Animate to top-down view.
+      // Tiny Z offset avoids gimbal-lock singularity when OrbitControls resumes.
+      const endPos = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
+      const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 0, -1));
+      const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+
+      topDownAnim = {
+        startPos: camera.position.clone(), endPos,
+        startQuat: camera.quaternion.clone(), endQuat,
+        target,
+        t0: performance.now(), duration: 800, done: false
+      };
+    }
     controls.enabled = false;
   });
 
@@ -284,5 +312,5 @@ export function createViewer() {
   }
   animate();
 
-  return { scene, camera, renderer, controls, setTickSprites };
+  return { scene, camera, renderer, controls, setTickSprites, setHomeState };
 }

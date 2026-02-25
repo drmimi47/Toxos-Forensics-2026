@@ -250,48 +250,8 @@ export function setupTooltips(camera, scene, tooltipEl) {
 
     if (justClosed()) return;
 
-    // If card is open and click is outside the card and not on the model, close the card
-    if (isDetailOpen()) {
-      // If click is NOT on the detail panel and NOT on a model sprite
-      const isOnPanel = e.target.closest('#detail-panel');
-      // Use canvas bounds for accurate normalised pointer coords
-      const clickRect = viewerCanvas
-        ? viewerCanvas.getBoundingClientRect()
-        : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight, right: window.innerWidth };
-      // Raycast to check if click is on a model sprite
-      const clickPtr = new THREE.Vector2(
-        ((e.clientX - clickRect.left) / clickRect.width) * 2 - 1,
-        -((e.clientY - clickRect.top) / clickRect.height) * 2 + 1
-      );
-      raycaster.setFromCamera(clickPtr, camera);
-      const hits = raycaster.intersectObjects(scene.children, true);
-      const hit = hits.find(i => i.object.userData?.type && i.object.parent?.visible !== false);
-      if (!isOnPanel && !hit) {
-        // Clicked outside the card and not on the model
-        // Call closeDetail() directly to ensure full close behavior
-        if (typeof window.closeDetail === 'function') {
-          window.closeDetail();
-        } else {
-          window.dispatchEvent(new CustomEvent('detail-close'));
-        }
-        return;
-      }
-      // If click is on panel or model, continue as normal
-      if (isOnPanel) return;
-      if (hit) {
-        const sprite = hit.object;
-        const group = sprite.parent;
-        // Collect all visible sprites from this dataset group
-        const sprites = group.children.filter(c => c.userData?.type);
-        const index = sprites.indexOf(sprite);
-        applySelection(sprite);
-        openDetail({ type: sprite.userData.type, sprite, group: sprites, index });
-      }
-      return;
-    }
-
-    // Ignore clicks on UI overlays (detail panel, buttons, etc.)
-    if (e.target.closest('#detail-panel')) return;
+    // Don't let clicks on an open panel register as 3D scene interactions
+    if (e.target.closest('.detail-panel')) return;
 
     // Use canvas bounds for accurate normalised pointer coords
     const clickRect = viewerCanvas

@@ -1,3 +1,18 @@
+.dp-draggable {
+  cursor: grab;
+  user-select: none;
+}
+.dp-draggable.dragging {
+  cursor: grabbing;
+}
+
+.detail-panel.dragging {
+  transition: none !important;
+  opacity: 0.98;
+  filter: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 1.5px 8px rgba(0,0,0,0.10);
+  z-index: 9999;
+}
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap");
 
 /* ===== Animatable CSS Custom Properties ===== */
@@ -240,17 +255,21 @@ body {
   color: #ffffff;
 }
 
+.brand-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  color: #ffffff; /* must be explicit (not inherited) so mix-blend-mode: difference works in both modes */
+  margin-left: 0.4em;
+  vertical-align: top;
+  position: relative;
+  top: 9px; /* ← nudge down (positive = lower, negative = higher) */
+}
+
 .brand-divider {
   width: 1px;
   height: 16px;
   background: var(--border-bright);
-}
-
-.brand-sub {
-  font-size: 0.82rem;
-  font-weight: 300;
-  color: var(--text-dim);
-  letter-spacing: 0.02em;
 }
 
 /* ===== Legend ===== */

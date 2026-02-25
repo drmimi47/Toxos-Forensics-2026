@@ -39,7 +39,7 @@ async function init() {
   setProgress(5, "Setting up scene");
 
   // 1. Spin up the 3D viewer
-  const { scene, camera, renderer, controls, setTickSprites } = createViewer();
+  const { scene, camera, renderer, controls, setTickSprites, setHomeState } = createViewer();
   const tooltipEl = document.getElementById("tooltip");
 
   try {
@@ -58,6 +58,8 @@ async function init() {
 
     // 3. Auto-frame the camera around the loaded model
     frameBoundingBox(model, camera, controls);
+    // Capture the isometric home position before animateIntro moves the camera
+    setHomeState(camera.position, controls.target);
 
     setProgress(85, "Loading data overlays");
 

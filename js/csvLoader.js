@@ -108,7 +108,7 @@ function toSceneCoords(xEpsg, yEpsg) {
 
   return new THREE.Vector3(
     xEpsg * ft2m - off.x,
-    CONFIG.marker.heightOffset - off.y,
+    CONFIG.marker.heightOffset,
     -(yEpsg * ft2m) - off.z
   );
 }

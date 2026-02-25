@@ -4,7 +4,9 @@
   "description": "Three.js viewer for NYC topography GLB model with CSO/NPDES data overlay",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/lastUpdated.js",
     "dev": "vite",
+    "prebuild": "node scripts/lastUpdated.js",
     "build": "vite build",
     "preview": "vite preview"
   },
