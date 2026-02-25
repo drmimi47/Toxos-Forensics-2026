@@ -38,8 +38,8 @@ export function createViewer() {
   const frustumSize = CONFIG.camera.orthoSize || 4000; // half-height in world units
   const camera = new THREE.OrthographicCamera(
     -frustumSize * aspect,   // left
-     frustumSize * aspect,   // right
-     frustumSize,             // top
+    frustumSize * aspect,   // right
+    frustumSize,             // top
     -frustumSize,             // bottom
     CONFIG.camera.near,
     CONFIG.camera.far
@@ -93,11 +93,11 @@ export function createViewer() {
   // ---- Panel shift state ----
   // When the detail card opens we shift + slightly shrink the camera frustum so
   // the scene re-centres in the visible area and appears a touch smaller.
-  const PANEL_PX         = 404;   // visual width the open card occupies (px)
-  let panelT        = 0;          // 0 = closed, 1 = fully open
-  let panelTarget   = 0;
+  const PANEL_PX = 404;   // visual width the open card occupies (px)
+  let panelT = 0;          // 0 = closed, 1 = fully open
+  let panelTarget = 0;
   let panelPrevTime = performance.now();
-  let _baseHalfH    = 0;          // camera.top captured after frameBoundingBox
+  let _baseHalfH = 0;          // camera.top captured after frameBoundingBox
 
   /**
    * Shift + scale the orthographic frustum so the scene appears centred in
@@ -112,7 +112,7 @@ export function createViewer() {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
-    const a     = w / h;
+    const a = w / h;
     const scale = 1 + 0.12 * panelT;       // expand frustum → objects appear smaller
     const halfH = base * scale;
     const halfW = halfH * a;
@@ -124,18 +124,18 @@ export function createViewer() {
       //   ∴  s = –PANEL_FRAC * panelT * halfH
       const PANEL_FRAC = 0.72;
       const s = -(PANEL_FRAC * panelT) * halfH;
-      camera.top    = halfH + s;
+      camera.top = halfH + s;
       camera.bottom = -halfH + s;
-      camera.left   = -halfW;
-      camera.right  =  halfW;
+      camera.left = -halfW;
+      camera.right = halfW;
     } else {
       // Desktop: right card at 404 px — shift frustum right so scene centres in remaining area.
-      const P     = PANEL_PX * panelT;
+      const P = PANEL_PX * panelT;
       const shift = P * halfW / w;
-      camera.top    =  halfH;
+      camera.top = halfH;
       camera.bottom = -halfH;
-      camera.left   = -halfW + shift;
-      camera.right  =  halfW + shift;
+      camera.left = -halfW + shift;
+      camera.right = halfW + shift;
     }
     camera.updateProjectionMatrix();
   }
@@ -177,11 +177,11 @@ export function createViewer() {
 
   renderer.domElement.addEventListener('dblclick', () => {
     const target = controls.target.clone();
-    const dist   = camera.position.distanceTo(target);
+    const dist = camera.position.distanceTo(target);
 
     // Tiny Z offset avoids gimbal-lock singularity when OrbitControls resumes
-    const endPos    = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
-    const startPos  = camera.position.clone();
+    const endPos = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
+    const startPos = camera.position.clone();
     const startQuat = camera.quaternion.clone();
 
     // Build a deterministic top-down quaternion from a fresh lookAt matrix.

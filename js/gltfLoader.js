@@ -44,7 +44,7 @@ export async function loadModel(scene, onProgress) {
   // Pre-load both textures in parallel so mode switching is instant
   const [lightTex, darkTex] = await Promise.all([
     loadTex('./assets/textures/gltf_embedded_0.png'),
-    loadTex('./assets/textures/gltf_embedded_0_light.png'),
+    loadTex('./assets/textures/gltf_embedded_0.jpeg'),
   ]);
 
   // MeshBasicMaterial with onBeforeCompile to crossfade two textures via mixT (0=light, 1=dark).
@@ -226,9 +226,9 @@ export async function loadModel(scene, onProgress) {
 
         // Fixed endpoints for lerping
         const B_LIGHT = new THREE.Color(0x555555);
-        const B_DARK = new THREE.Color(0xeeeeee);
+        const B_DARK = new THREE.Color(0xcccccc);
         const S_LIGHT = new THREE.Color(0x444444);
-        const S_DARK = new THREE.Color(0xffffff);
+        const S_DARK = new THREE.Color(0xeeeeee);
 
         // t = 0 → full light mode, t = 1 → full dark mode
         const setModeProgress = (t) => {

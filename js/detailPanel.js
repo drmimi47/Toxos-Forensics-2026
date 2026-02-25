@@ -69,9 +69,9 @@ window.closeDetail = closeDetail;
 /* ---------- Type → accent color ---------- */
 function typeColor(type) {
   const t = String(type).toLowerCase();
-  if (t.includes('cso'))   return 'var(--cso-color)';
+  if (t.includes('cso')) return 'var(--cso-color)';
   if (t.includes('npdes')) return 'var(--npdes-color)';
-  if (t.includes('rcra'))  return 'var(--rcra-color)';
+  if (t.includes('rcra')) return 'var(--rcra-color)';
   return 'var(--accent)';
 }
 
@@ -79,9 +79,9 @@ function typeColor(type) {
 let panel, titleEl, bodyEl, metaEl, imageWrap, badgeEl;
 let prevBtn, nextBtn, counterEl, closeBtn;
 let scrollEl;
-let domReady  = false;
-let isOpen    = false;
-let closedAt  = 0;
+let domReady = false;
+let isOpen = false;
+let closedAt = 0;
 
 /* ---------- Navigation state ---------- */
 let currentGroup = [];   // flat array of sprites in the active dataset
@@ -89,25 +89,25 @@ let currentIndex = 0;
 
 function ensureDOM() {
   if (domReady) return;
-  panel      = document.getElementById('detail-panel');
-  titleEl    = document.getElementById('detail-title');
-  bodyEl     = document.getElementById('detail-body');
-  metaEl     = document.getElementById('detail-meta');
-  imageWrap  = document.getElementById('dp-image-wrap');
-  badgeEl    = document.getElementById('dp-type-badge');
-  prevBtn    = document.getElementById('detail-prev');
-  nextBtn    = document.getElementById('detail-next');
-  counterEl  = document.getElementById('dp-counter');
-  closeBtn   = document.getElementById('detail-close');
-  scrollEl   = panel?.querySelector('.dp-scroll');
-  domReady   = true;
+  panel = document.getElementById('detail-panel');
+  titleEl = document.getElementById('detail-title');
+  bodyEl = document.getElementById('detail-body');
+  metaEl = document.getElementById('detail-meta');
+  imageWrap = document.getElementById('dp-image-wrap');
+  badgeEl = document.getElementById('dp-type-badge');
+  prevBtn = document.getElementById('detail-prev');
+  nextBtn = document.getElementById('detail-next');
+  counterEl = document.getElementById('dp-counter');
+  closeBtn = document.getElementById('detail-close');
+  scrollEl = panel?.querySelector('.dp-scroll');
+  domReady = true;
 }
 
 /* ---------- Content rendering ---------- */
 
 function fillContent(content, userData, type) {
   if (titleEl) titleEl.textContent = content.title || '';
-  if (bodyEl)  bodyEl.textContent  = content.body  || '';
+  if (bodyEl) bodyEl.textContent = content.body || '';
 
   // Type badge with colored dot
   if (badgeEl) {
@@ -147,9 +147,9 @@ function fillContent(content, userData, type) {
     if (content.image) {
       const img = document.createElement('img');
       img.className = 'detail-panel-image';
-      img.src       = content.image;
-      img.alt       = content.title || '';
-      img.loading   = 'eager';
+      img.src = content.image;
+      img.alt = content.title || '';
+      img.loading = 'eager';
       imageWrap.appendChild(img);
     }
   }
@@ -160,9 +160,9 @@ function fillContent(content, userData, type) {
  * between points to cross-fade the content.
  */
 function renderPoint(animate) {
-  const sprite  = currentGroup[currentIndex];
-  const d       = sprite?.userData || {};
-  const type    = d.type || '';
+  const sprite = currentGroup[currentIndex];
+  const d = sprite?.userData || {};
+  const type = d.type || '';
   const content = d._direct || DATASET_CONTENT[type] || fallbackContent(type);
 
   // Update counter
@@ -186,9 +186,9 @@ function renderPoint(animate) {
   if (animate && scrollEl) {
     // Quick fade out
     scrollEl.style.transition = 'opacity 0.1s ease, transform 0.12s ease, filter 0.1s ease';
-    scrollEl.style.opacity    = '0';
-    scrollEl.style.transform  = 'translateY(7px)';
-    scrollEl.style.filter     = 'blur(4px)';
+    scrollEl.style.opacity = '0';
+    scrollEl.style.transform = 'translateY(7px)';
+    scrollEl.style.filter = 'blur(4px)';
 
     setTimeout(() => {
       fillContent(content, d, type);
@@ -196,17 +196,17 @@ function renderPoint(animate) {
       if (scrollEl) scrollEl.scrollTop = 0;
       // Smooth fade in
       scrollEl.style.transition = 'opacity 0.38s cubic-bezier(0.2,0.8,0.3,1), transform 0.38s cubic-bezier(0.2,0.8,0.3,1), filter 0.32s ease';
-      scrollEl.style.opacity    = '1';
-      scrollEl.style.transform  = 'translateY(0)';
-      scrollEl.style.filter     = 'blur(0px)';
+      scrollEl.style.opacity = '1';
+      scrollEl.style.transform = 'translateY(0)';
+      scrollEl.style.filter = 'blur(0px)';
     }, 115);
   } else {
     fillContent(content, d, type);
     if (scrollEl) {
       scrollEl.style.transition = '';
-      scrollEl.style.opacity    = '1';
-      scrollEl.style.transform  = 'translateY(0)';
-      scrollEl.style.filter     = 'blur(0px)';
+      scrollEl.style.opacity = '1';
+      scrollEl.style.transform = 'translateY(0)';
+      scrollEl.style.filter = 'blur(0px)';
     }
   }
 }
@@ -273,18 +273,18 @@ export function openDetail(payload) {
 
   if (typeof payload === 'string') {
     // Legacy / history-restore path
-    type  = payload;
+    type = payload;
     group = [{ userData: { type } }];
     index = 0;
   } else if (payload.title || payload.image) {
     // Direct content from scene-image labels (labels.js) – no type lookup needed
-    type  = payload.title || 'Image';
+    type = payload.title || 'Image';
     group = [{ userData: { type, _direct: { title: payload.title, body: payload.body, image: payload.image } } }];
     index = 0;
   } else {
-    type  = payload.type;
-    group = payload.group  || [payload.sprite || { userData: { type } }];
-    index = payload.index  ?? 0;
+    type = payload.type;
+    group = payload.group || [payload.sprite || { userData: { type } }];
+    index = payload.index ?? 0;
   }
 
   currentGroup = group;
@@ -328,7 +328,7 @@ export function closeDetail() {
   panel.classList.remove('visible');
   document.body.classList.remove('panel-open');
   panel.setAttribute('aria-hidden', 'true');
-  isOpen   = false;
+  isOpen = false;
   closedAt = performance.now();
 
   // Tell utils.js to clear the selected sprite and restore all opacities
