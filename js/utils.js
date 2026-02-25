@@ -252,6 +252,10 @@ export function setupTooltips(camera, scene, tooltipEl) {
   // Track whether the pointer is currently pressed so pointermove can skip
   // expensive raycasting during drags (critical for touch performance).
   let _pointerIsDown = false;
+  // Double-tap state (touch only — desktop uses native dblclick in viewer.js)
+  let _lastTapTime = 0;
+  let _lastTapX = 0;
+  let _lastTapY = 0;
 
   window.addEventListener('pointerdown', (e) => {
     _pointerIsDown = true;
@@ -267,12 +271,32 @@ export function setupTooltips(camera, scene, tooltipEl) {
     // Ignore drags (only fire on actual clicks)
     const dx = e.clientX - pointerDownPos.x;
     const dy = e.clientY - pointerDownPos.y;
-    if (dx * dx + dy * dy > 25) return;   // moved more than 5 px → drag
+    if (dx * dx + dy * dy > 25) {
+      _lastTapTime = 0;   // drag breaks any pending double-tap sequence
+      return;
+    }
 
     if (justClosed()) return;
 
     // Don't let clicks on an open panel register as 3D scene interactions
     if (e.target.closest('.detail-panel')) return;
+
+    // Double-tap detection — touch only; desktop gets native dblclick in viewer.js.
+    // Two taps within 300 ms and 40 px of each other → camera toggle, skip panel open.
+    if (e.pointerType === 'touch') {
+      const now = performance.now();
+      const tdx = e.clientX - _lastTapX;
+      const tdy = e.clientY - _lastTapY;
+      const isDoubleTap = (now - _lastTapTime) < 300 && (tdx * tdx + tdy * tdy) < 1600;
+      _lastTapTime = now;
+      _lastTapX = e.clientX;
+      _lastTapY = e.clientY;
+      if (isDoubleTap) {
+        _lastTapTime = 0;   // reset so a third tap doesn't re-trigger
+        window.dispatchEvent(new Event('double-tap'));
+        return;             // suppress detail-panel open on this tap
+      }
+    }
 
     // Use canvas bounds for accurate normalised pointer coords
     const clickRect = viewerCanvas

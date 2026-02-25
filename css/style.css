@@ -720,9 +720,6 @@ body.panel-open .scene-image img {
   #header {
     padding: 6px 16px;
   }
-  .brand-sub {
-    display: none;
-  }
   #legend {
     bottom: 48px;
     left: 16px;

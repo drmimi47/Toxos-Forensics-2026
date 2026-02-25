@@ -188,7 +188,8 @@ export function createViewer() {
     homeState = { pos: pos.clone(), target: target.clone() };
   }
 
-  renderer.domElement.addEventListener('dblclick', () => {
+  // Shared handler for both desktop dblclick and mobile double-tap.
+  function handleDoubleActivate() {
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
 
@@ -228,7 +229,12 @@ export function createViewer() {
       };
     }
     controls.enabled = false;
-  });
+  }
+
+  // Desktop: native double-click on the canvas
+  renderer.domElement.addEventListener('dblclick', handleDoubleActivate);
+  // Mobile: custom event dispatched by utils.js double-tap detector
+  window.addEventListener('double-tap', handleDoubleActivate);
 
   function easeInOutQuart(t) {
     return t < 0.5
