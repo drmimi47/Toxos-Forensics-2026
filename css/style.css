@@ -756,4 +756,48 @@ body.panel-open .scene-image img {
   body.panel-open #viewer-container {
     right: 0;
   }
+
+  /* --- Performance: strip expensive backdrop-filter effects on mobile --- */
+
+  /* Detail panel: remove blur bleed from closed (off-screen) state and
+     reduce saturate cost; filter:blur on a translated element can bleed
+     into the visible viewport on some mobile browsers. */
+  .detail-panel {
+    filter: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    /* Shorten transition — mobile repaints are slower */
+    transition:
+      opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+      transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .detail-panel.visible {
+    filter: none;
+  }
+
+  /* Footer: backdrop-filter on an always-visible bar continuously forces a
+     compositor layer on mobile — swap to a solid/semi-opaque background. */
+  #footer {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--bg-panel-solid);
+    opacity: 0.92;
+  }
+
+  /* Tooltip rarely appears on touch (no hover), so drop its blur too. */
+  #tooltip {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--bg-panel-solid);
+  }
+
+  /* Reduce legend label size to limit line-wrapping on narrow screens */
+  .legend-label {
+    font-size: 0.72rem;
+  }
+
+  /* Fast tap response for legend toggle buttons */
+  .legend-item {
+    touch-action: manipulation;
+  }
 }

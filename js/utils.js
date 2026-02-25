@@ -82,11 +82,16 @@ export function setupTooltips(camera, scene, tooltipEl) {
     return CONFIG.marker.screenSize;  // fallback for perspective
   }
 
-  /** Find all THREE.Group objects that hold data points. */
+  /** Find all THREE.Group objects that hold data points.
+   *  Result is cached after first call — groups are fixed after CSV load. */
+  let _groupCache = null;
   function getDataGroups() {
-    return scene.children.filter(
-      c => c.isGroup && c.children.length && c.children[0]?.userData?.type
-    );
+    if (!_groupCache) {
+      _groupCache = scene.children.filter(
+        c => c.isGroup && c.children.length && c.children[0]?.userData?.type
+      );
+    }
+    return _groupCache;
   }
 
   /** Set target opacity on every unique material in a group (lerped in tick). */
@@ -106,8 +111,13 @@ export function setupTooltips(camera, scene, tooltipEl) {
   const animating = new Set();
 
   /** Call this every frame from the main render loop for jitter-free scaling. */
+  let _lastBase = -1;
   function tick() {
     const base = getBaseSize();
+    // Only update all sprite scales when the frustum/zoom actually changed.
+    // With ~1 750 sprites this saves substantial JS time every idle frame.
+    const baseDirty = Math.abs(base - _lastBase) > 0.5;
+    if (baseDirty) _lastBase = base;
     const target = base * HOVER_SCALE;
 
     // Update ALL data-point sprites to the current constant-screen base size.
@@ -116,7 +126,7 @@ export function setupTooltips(camera, scene, tooltipEl) {
     for (const group of getDataGroups()) {
       for (const sprite of group.children) {
         if (!animating.has(sprite)) {
-          sprite.scale.set(base, base, 1);
+          if (baseDirty) sprite.scale.set(base, base, 1);
         }
       }
     }
@@ -156,6 +166,9 @@ export function setupTooltips(camera, scene, tooltipEl) {
   const viewerCanvas = document.querySelector('#viewer-container canvas');
 
   window.addEventListener('pointermove', (event) => {
+    // Skip hover raycasting during any drag — hugely expensive on mobile touchmove.
+    if (_pointerIsDown) return;
+
     // Normalise to canvas bounds (not window) so raycasting stays accurate
     // when the detail panel squeezes the viewer into a narrower rectangle.
     const canvasRect = viewerCanvas
@@ -236,13 +249,21 @@ export function setupTooltips(camera, scene, tooltipEl) {
 
   /* --- Click a data point → open dataset detail panel --- */
   let pointerDownPos = { x: 0, y: 0 };
+  // Track whether the pointer is currently pressed so pointermove can skip
+  // expensive raycasting during drags (critical for touch performance).
+  let _pointerIsDown = false;
 
   window.addEventListener('pointerdown', (e) => {
+    _pointerIsDown = true;
     pointerDownPos.x = e.clientX;
     pointerDownPos.y = e.clientY;
+    // Hide tooltip immediately on press so it doesn't linger during drag
+    tooltipEl.classList.add('hidden');
   });
+  window.addEventListener('pointercancel', () => { _pointerIsDown = false; });
 
   window.addEventListener('pointerup', (e) => {
+    _pointerIsDown = false;
     // Ignore drags (only fire on actual clicks)
     const dx = e.clientX - pointerDownPos.x;
     const dy = e.clientY - pointerDownPos.y;

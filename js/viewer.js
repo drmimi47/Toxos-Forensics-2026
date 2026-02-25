@@ -11,8 +11,11 @@ export function createViewer() {
   const container = document.getElementById('viewer-container');
 
   // ---- Renderer ----
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
+  // On mobile: skip antialias (big GPU win) and cap DPR at 1.5 (3× phones would
+  // otherwise render 9× as many pixels for a barely perceptible quality bump).
+  const isMobile = window.innerWidth <= 640;
+  const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
