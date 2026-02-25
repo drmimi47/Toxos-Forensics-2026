@@ -272,6 +272,64 @@ body {
   background: var(--border-bright);
 }
 
+/* ===== Header Subnav ===== */
+.subnav-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: all;
+  top: 8px;    /* vertical nudge: positive = down, negative = up */
+  left: 0px;   /* horizontal nudge: positive = right, negative = left */
+}
+
+/* Beveled border frame: white fill clipped to octagon = 1px visible border via difference blend */
+.subnav-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  clip-path: polygon(
+    6px 0%, calc(100% - 6px) 0%,
+    100% 6px, 100% calc(100% - 6px),
+    calc(100% - 6px) 100%, 6px 100%,
+    0% calc(100% - 6px), 0% 6px
+  );
+}
+
+/* Inner nav: black bg = no-op in difference blend ("transparent"); 1px margin reveals white frame */
+#subnav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 5px 14px;
+  margin: -1px;
+  background: #000000;
+  clip-path: polygon(
+    5px 0%, calc(100% - 5px) 0%,
+    100% 5px, 100% calc(100% - 5px),
+    calc(100% - 5px) 100%, 5px 100%,
+    0% calc(100% - 5px), 0% 5px
+  );
+}
+
+.subnav-item {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-decoration: none;
+  white-space: nowrap;
+  pointer-events: all;
+  transition: opacity 0.15s;
+}
+
+.subnav-item:hover {
+  opacity: 0.6;
+}
+
 /* ===== Legend ===== */
 #legend {
   position: absolute;
@@ -424,9 +482,9 @@ body {
   filter: blur(12px);
 
   transition:
-    opacity 0.55s cubic-bezier(0.32, 0.72, 0, 1),
-    transform 0.55s cubic-bezier(0.32, 0.72, 0, 1),
-    filter 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    filter 0.30s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .detail-panel.visible {
@@ -719,6 +777,9 @@ body.panel-open .scene-image img {
 @media screen and (max-width: 640px) {
   #header {
     padding: 6px 16px;
+  }
+  .subnav-wrap {
+    display: none;
   }
   #legend {
     bottom: 48px;
