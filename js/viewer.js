@@ -321,5 +321,22 @@ export function createViewer() {
   }
   animate();
 
-  return { scene, camera, renderer, controls, setTickSprites, setHomeState };
+  /** Smoothly animate the camera back to the post-framing isometric home state. */
+  function goHome() {
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+    const endPos = homeState.pos.clone();
+    const homeTarget = homeState.target.clone();
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, homeTarget, new THREE.Vector3(0, 1, 0));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: camera.position.clone(), endPos,
+      startQuat: camera.quaternion.clone(), endQuat,
+      target: homeTarget,
+      t0: performance.now(), duration: 900, done: false
+    };
+    controls.enabled = false;
+  }
+
+  return { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome };
 }

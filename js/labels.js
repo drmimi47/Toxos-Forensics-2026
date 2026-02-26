@@ -37,18 +37,16 @@ export function addLabel(scene, text, x, y, z, opts = {}) {
  * Edit the entries below to reposition or add new labels.
  */
 export function addAllLabels(scene) {
-  // "East River" – placed near the model centre, elevated above terrain
-  // Adjust x, y, z to move it to the desired anchor point.
-  addLabel(scene, 'East River', -2000, 150, -200);
-
-  // "GREENPOINT" – central placeholder, adjust x, y, z to reposition
-  addLabel(scene, 'GREENPOINT', -800, 150, -1000);
-
-  // "LONG ISLAND CITY" – central placeholder, adjust x, y, z to reposition
-  addLabel(scene, 'LONG ISLAND CITY', -750, 150, -2200);
-
-  // "EAST WILLIAMSBURG" – two-line, centre-aligned; adjust x, y, z to reposition
-  addLabel(scene, 'EAST WILLIAMSBURG', 1100, 150, 1800);
+  return [
+    // "East River" – placed near the model centre, elevated above terrain
+    addLabel(scene, 'East River', -2000, 150, -200),
+    // "GREENPOINT" – central placeholder, adjust x, y, z to reposition
+    addLabel(scene, 'GREENPOINT', -800, 150, -1000),
+    // "LONG ISLAND CITY" – central placeholder, adjust x, y, z to reposition
+    addLabel(scene, 'LONG ISLAND CITY', -750, 150, -2200),
+    // "EAST WILLIAMSBURG" – two-line, centre-aligned; adjust x, y, z to reposition
+    addLabel(scene, 'EAST WILLIAMSBURG', 1100, 150, 1800),
+  ];
 }
 
 /**
@@ -100,9 +98,10 @@ export function addImage(scene, id, src, x, y, z, opts = {}) {
  * Positions are scene-space; edit coordinates here or move in devtools.
  */
 export function addAllImages(scene) {
-  // Near the Rhino origin — small offsets so they're visible above terrain
-  addImage(scene, 'IMG_1', './assets/images/IMG_1.jpg', 450, 100, -725);
-  addImage(scene, 'IMG_2', './assets/images/IMG_2.jpg', 700, 100, -100);
-  addImage(scene, 'IMG_3', './assets/images/IMG_3.jpg', -325, 100, -1550);
-  addImage(scene, 'IMG_4', './assets/images/IMG_4.jpg', -75, 100, -1525);
+  return [
+    addImage(scene, 'IMG_1', './assets/images/IMG_1.jpg', 450, 100, -725),
+    addImage(scene, 'IMG_2', './assets/images/IMG_2.jpg', 700, 100, -100),
+    addImage(scene, 'IMG_3', './assets/images/IMG_3.jpg', -325, 100, -1550),
+    addImage(scene, 'IMG_4', './assets/images/IMG_4.jpg', -75, 100, -1525),
+  ];
 }

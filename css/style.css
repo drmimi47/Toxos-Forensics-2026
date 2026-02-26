@@ -229,7 +229,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 10;
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -328,6 +328,19 @@ body {
 
 .subnav-item:hover {
   opacity: 0.6;
+}
+
+#subnav-dot {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ffffff;
+  pointer-events: none;
+  transform: translateX(0);
+  transition: transform 0.42s cubic-bezier(0.34, 1.35, 0.64, 1);
 }
 
 /* ===== Legend ===== */
@@ -664,6 +677,59 @@ body.dark .dp-meta-grid {
   line-height: 1.78;
   color: var(--text-dim);
   margin: 0;
+}
+
+/* ===== Credits Overlay ===== */
+#credits-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg-panel);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Hidden state */
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(8px);
+  transition:
+    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    filter 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+#credits-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+  filter: blur(0);
+}
+
+.credits-content {
+  text-align: center;
+}
+
+.credits-role {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 4px 0;
+}
+
+.credits-role + .credits-role,
+.credits-name + .credits-role {
+  margin-top: 20px;
+}
+
+.credits-name {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  margin: 0 0 2px 0;
 }
 
 /* ===== Footer ===== */
