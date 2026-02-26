@@ -133,7 +133,7 @@ async function init() {
     // Callback assigned once the dark-mode engine is ready (see below)
     let _triggerMode = null;
 
-    // 5. Disected view: explode dataset groups vertically + snap camera home
+    // 5. Dissected view: explode dataset groups vertically + snap camera home
     {
       // Collect all loaded groups, then sort largest → smallest so the densest
       // dataset sits closest to the ground and the sparsest floats highest.
@@ -287,7 +287,7 @@ async function init() {
           // set * 0.x multiplier to lower to zoom out more in collage
           if (name === 'collage') { goTopDown(); setExplode(explodeGroups.map(() => 0)); setZoom(homeZoom * 0.4); return; }
 
-          if (name === 'disected') {
+          if (name === 'dissected') {
             goHome();
             setExplode(explodeGroups.map((_, i) => (i + 1) * 400));
             setZoom(homeZoom * 0.75);
