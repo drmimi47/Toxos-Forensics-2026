@@ -338,5 +338,48 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  return { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome };
+  /**
+   * Like goHome() but with the camera tilted more to the side (lower elevation)
+   * for the FATBERG bare-model view. Reduces the Y component of the home
+   * direction vector so the viewpoint sits closer to the horizon.
+   */
+  function goFatbergView() {
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+    const target = homeState.target.clone();
+    const dist = homeState.pos.distanceTo(target);
+    // Flatten the isometric direction: keep XZ azimuth, pull Y down to ~60% of its
+    // home value (shifts elevation from ~35° to ~22° — noticeably more side-on).
+    const homeDir = homeState.pos.clone().sub(target).normalize();
+    const flatDir = new THREE.Vector3(homeDir.x, homeDir.y * 0.6, homeDir.z).normalize();
+    const endPos = target.clone().addScaledVector(flatDir, dist);
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 1, 0));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: camera.position.clone(), endPos,
+      startQuat: camera.quaternion.clone(), endQuat,
+      target,
+      t0: performance.now(), duration: 900, done: false
+    };
+    controls.enabled = false;
+  }
+
+  /** Animate the camera to a straight-down top view (same angle as double-click). */
+  function goTopDown() {
+    if (topDownAnim) topDownAnim.done = true;
+    const target = controls.target.clone();
+    const dist = camera.position.distanceTo(target);
+    const endPos = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 0, -1));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: camera.position.clone(), endPos,
+      startQuat: camera.quaternion.clone(), endQuat,
+      target,
+      t0: performance.now(), duration: 800, done: false
+    };
+    controls.enabled = false;
+  }
+
+  return { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goFatbergView, goTopDown };
 }

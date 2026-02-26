@@ -15,6 +15,7 @@ import { loadAllCSV } from "./csvLoader.js";
 import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
 import { closeDetail, getDetailType } from "./detailPanel.js";
 import { addAllLabels, addAllImages } from "./labels.js";
+import { createCollagePlanes } from "./collage.js";
 
 /* ---------- Preloader helpers ---------- */
 const preloaderEl = document.querySelector(".preloader");
@@ -39,7 +40,7 @@ async function init() {
   setProgress(5, "Setting up scene");
 
   // 1. Spin up the 3D viewer
-  const { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome } = createViewer();
+  const { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goFatbergView, goTopDown } = createViewer();
   const tooltipEl = document.getElementById("tooltip");
 
   try {
@@ -57,6 +58,7 @@ async function init() {
     setProgress(80, "Framing view");
 
     // 3. Auto-frame the camera around the loaded model
+    const modelBox = new THREE.Box3().setFromObject(model);
     frameBoundingBox(model, camera, controls);
     // Capture the isometric home position before animateIntro moves the camera
     setHomeState(camera.position, controls.target);
@@ -70,6 +72,9 @@ async function init() {
     // 4b. Add CSS2D point-of-interest labels and anchored images
     const sceneLabels = addAllLabels(scene);
     const sceneImages = addAllImages(scene);
+
+    // 4c. Create flat collage image planes (hidden until COLLAGE submenu is active)
+    const collage = createCollagePlanes(scene, modelBox);
 
     // Update legend counts
     if (csvResults.cso) {
@@ -195,6 +200,7 @@ async function init() {
       });
 
       const creditsOverlay = document.getElementById('credits-overlay');
+      const aboutOverlay = document.getElementById('about-overlay');
 
       // All scene objects that Fatberg should hide
       const overlayObjects = [...sceneLabels, ...sceneImages];
@@ -256,18 +262,30 @@ async function init() {
         item.addEventListener('click', () => {
           const name = item.textContent.trim().toLowerCase();
           const isCredits = name === 'credits';
+          const isAbout   = name === 'about';
           const isFatberg = name === 'fatberg';
 
-          // Show or hide the credits overlay
+          // Show or hide the credits / about overlays
           creditsOverlay?.classList.toggle('visible', isCredits);
+          aboutOverlay?.classList.toggle('visible', isAbout);
 
-          // Don't change 3D state when just opening credits
-          if (isCredits) return;
+          // Don't change 3D state when just opening an overlay
+          if (isCredits || isAbout) return;
+
+          // Show collage drawings when in COLLAGE mode, hide otherwise
+          if (name === 'collage') { collage.show(); } else { collage.hide(); }
+
+          // Disable LMB rotation in COLLAGE (top-down pan mode); restore otherwise
+          const isCollage = name === 'collage';
+          controls.mouseButtons.LEFT = isCollage ? null : THREE.MOUSE.ROTATE;
+          document.body.classList.toggle('collage-mode', isCollage);
 
           // Fatberg: bare 3D model only — fade all data overlays out/in, reset camera
           fadeOverlays(!isFatberg);
 
-          if (isFatberg) { goHome(); setZoom(homeZoom); _triggerMode?.(false); return; }
+          if (isFatberg) { goFatbergView(); setZoom(homeZoom); _triggerMode?.(false); return; }
+          // set * 0.x multiplier to lower to zoom out more in collage
+          if (name === 'collage') { goTopDown(); setExplode(explodeGroups.map(() => 0)); setZoom(homeZoom * 0.4); return; }
 
           if (name === 'disected') {
             goHome();

@@ -274,12 +274,13 @@ body {
 
 /* ===== Header Subnav ===== */
 .subnav-wrap {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, calc(-50% + 8px));
   display: inline-flex;
   align-items: center;
   pointer-events: all;
-  top: 8px;    /* vertical nudge: positive = down, negative = up */
-  left: 0px;   /* horizontal nudge: positive = right, negative = left */
 }
 
 /* Beveled border frame: white fill clipped to octagon = 1px visible border via difference blend */
@@ -679,6 +680,46 @@ body.dark .dp-meta-grid {
   margin: 0;
 }
 
+/* ===== About Overlay ===== */
+#about-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg-panel);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  overflow-y: auto;
+
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(8px);
+  transition:
+    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    filter 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+#about-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+  filter: blur(0);
+}
+
+#about-overlay .credits-content {
+  max-width: 640px;
+  width: 90%;
+  margin: 0 auto;
+  padding: 225px 0 80px;
+}
+
+.about-body {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  margin: 0 0 14px 0;
+  line-height: 1.8;
+}
+
 /* ===== Credits Overlay ===== */
 #credits-overlay {
   position: fixed;
@@ -707,7 +748,12 @@ body.dark .dp-meta-grid {
 }
 
 .credits-content {
-  text-align: center;
+  text-align: left;
+}
+
+/* Add to any element inside credits-content to insert a larger-than-normal gap above it. */
+.section-gap {
+  margin-top: 36px !important;
 }
 
 .credits-role {
@@ -730,6 +776,19 @@ body.dark .dp-meta-grid {
   color: var(--text);
   letter-spacing: 0.04em;
   margin: 0 0 2px 0;
+}
+
+.credits-note {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text);
+  opacity: 0.50;
+  letter-spacing: 0.04em;
+  margin: 18px 0 0 0;
+}
+
+.credits-note + .credits-note {
+  margin-top: 2px;
 }
 
 /* ===== Footer ===== */
@@ -780,6 +839,14 @@ body.dark .dp-meta-grid {
 /* Touch vs mouse */
 .controls-mouse {
   display: block;
+}
+
+/* LMB rotate hint dims when rotation is disabled in COLLAGE mode */
+.ctrl-lmb {
+  transition: opacity 0.3s ease;
+}
+body.collage-mode .ctrl-lmb {
+  opacity: 0.38;
 }
 
 /* ===== CSS2D Scene Labels ===== */

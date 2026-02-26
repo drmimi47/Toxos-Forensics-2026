@@ -8,6 +8,12 @@ import { openDetail, isDetailOpen, justClosed } from './detailPanel.js';
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
+/** Returns true when the credits or about overlay is currently visible. */
+function overlayActive() {
+  return document.getElementById('credits-overlay')?.classList.contains('visible') ||
+         document.getElementById('about-overlay')?.classList.contains('visible');
+}
+
 /**
  * Set up mouse-move raycasting to show tooltips when hovering data points.
  * @param {THREE.Camera} camera
@@ -166,6 +172,8 @@ export function setupTooltips(camera, scene, tooltipEl) {
   const viewerCanvas = document.querySelector('#viewer-container canvas');
 
   window.addEventListener('pointermove', (event) => {
+    // Skip raycasting entirely while a full-screen overlay is open.
+    if (overlayActive()) return;
     // Skip hover raycasting during any drag — hugely expensive on mobile touchmove.
     if (_pointerIsDown) return;
 
@@ -268,6 +276,8 @@ export function setupTooltips(camera, scene, tooltipEl) {
 
   window.addEventListener('pointerup', (e) => {
     _pointerIsDown = false;
+    // Skip interaction entirely while a full-screen overlay is open.
+    if (overlayActive()) return;
     // Ignore drags (only fire on actual clicks)
     const dx = e.clientX - pointerDownPos.x;
     const dy = e.clientY - pointerDownPos.y;
