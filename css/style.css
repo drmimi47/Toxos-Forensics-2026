@@ -906,6 +906,35 @@ body.panel-open .scene-image img {
   text-align: center;
 }
 
+/* ===== Snap Cursor ===== */
+#snap-cursor {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 10000;
+  display: none;
+  color: var(--label);
+}
+#snap-cursor::before,
+#snap-cursor::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+}
+#snap-cursor::before {       /* vertical arm */
+  width: 1px;
+  height: 14px;
+  left: -0.5px;
+  top: -7px;
+}
+#snap-cursor::after {        /* horizontal arm */
+  width: 14px;
+  height: 1px;
+  left: -7px;
+  top: -0.5px;
+}
+
 /* ===== Responsive ===== */
 @media screen and (max-width: 640px) {
   #header {

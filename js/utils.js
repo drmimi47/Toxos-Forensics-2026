@@ -20,7 +20,7 @@ function overlayActive() {
  * @param {THREE.Scene} scene
  * @param {HTMLElement} tooltipEl
  */
-export function setupTooltips(camera, scene, tooltipEl) {
+export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) {
   const DIM_OPACITY = 0.3;          // opacity for the non-hovered / non-selected sprites
   const FULL_OPACITY = 1.0;
   const HOVER_SCALE = 1.5;          // scale multiplier on hover
@@ -32,6 +32,43 @@ export function setupTooltips(camera, scene, tooltipEl) {
   let activeType = null;              // currently hovered group label
   let hoveredSprite = null;           // currently hovered sprite
   let selectedSprite = null;          // sprite whose detail card is open
+
+  // Crosshair lines (X and Z axes through hovered data point, DISSECTED mode only)
+  const _xPos = new Float32Array(6);
+  const _zPos = new Float32Array(6);
+  const _xGeom = new THREE.BufferGeometry();
+  const _zGeom = new THREE.BufferGeometry();
+  _xGeom.setAttribute('position', new THREE.BufferAttribute(_xPos, 3));
+  _zGeom.setAttribute('position', new THREE.BufferAttribute(_zPos, 3));
+  const _crossMat = new THREE.LineBasicMaterial({
+    color: 0xffffff,          // white source — blending inverts whatever is underneath
+    transparent: true,        // rendered in transparent pass so it composites over the scene
+    toneMapped: false,        // bypass ACES so the fragment stays at true (1,1,1) for perfect inversion
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneMinusDstColorFactor,   // result = 1 × (1 - dst) = 1 - dst  (exact inversion)
+    blendDst: THREE.ZeroFactor,
+  });
+  const _xLine = new THREE.Line(_xGeom, _crossMat);
+  const _zLine = new THREE.Line(_zGeom, _crossMat);
+  _xLine.renderOrder = 1002;
+  _zLine.renderOrder = 1002;
+  scene.add(_xLine, _zLine);
+  let _crossTarget = 0;
+  const CROSS_OPACITY = 1;
+
+  // Snap cursor — CSS element that jumps to the nearest data sprite within SNAP_RADIUS px
+  const _snapCursor = document.createElement('div');
+  _snapCursor.id = 'snap-cursor';
+  document.body.appendChild(_snapCursor);
+  const _tmpVec3 = new THREE.Vector3();
+  const SNAP_RADIUS = 60;    // pixels — attraction radius
+  let _snapX = null;         // effective client X while snapping, null when not
+  let _snapY = null;
+  let _clickSnapX = null;    // snap coords captured at pointerdown for use in pointerup
+  let _clickSnapY = null;
 
   // Per-sprite selection highlight via material cloning.
   // All sprites in a group share ONE SpriteMaterial; to make only the selected
@@ -113,6 +150,29 @@ export function setupTooltips(camera, scene, tooltipEl) {
     activeType = null;
   }
 
+  /** Project all visible data sprites to screen space and return the nearest one
+   *  within SNAP_RADIUS px, or null.  Fast path: only the group's Y offset is
+   *  applied (true for the explode animation), avoiding a full matrix traversal. */
+  function findSnapSprite(mx, my, canvasRect) {
+    const cw = canvasRect.width, ch = canvasRect.height;
+    let bestD2 = SNAP_RADIUS * SNAP_RADIUS, bestX = 0, bestY = 0, bestSprite = null;
+    for (const group of getDataGroups()) {
+      if (!group.visible) continue;
+      const gy = group.position.y;
+      for (const sprite of group.children) {
+        _tmpVec3.set(sprite.position.x, sprite.position.y + gy, sprite.position.z);
+        _tmpVec3.project(camera);
+        if (_tmpVec3.z > 1) continue;   // behind camera or beyond far plane
+        const px = ((_tmpVec3.x + 1) / 2) * cw + canvasRect.left;
+        const py = ((1 - _tmpVec3.y) / 2) * ch + canvasRect.top;
+        const dx = mx - px, dy = my - py;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) { bestD2 = d2; bestX = px; bestY = py; bestSprite = sprite; }
+      }
+    }
+    return bestSprite ? { px: bestX, py: bestY } : null;
+  }
+
   /* --- Constant-screen-size update + hover animation (called from render loop) --- */
   const animating = new Set();
 
@@ -167,6 +227,10 @@ export function setupTooltips(camera, scene, tooltipEl) {
         mat.opacity = next;
       }
     }
+
+    // Crosshair lines: inversion blending needs no color sync — toggle visibility for instant show/hide
+    _xLine.visible = _crossTarget > 0;
+    _zLine.visible = _crossTarget > 0;
   }
 
   const viewerCanvas = document.querySelector('#viewer-container canvas');
@@ -189,11 +253,28 @@ export function setupTooltips(camera, scene, tooltipEl) {
       if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; }
       if (!selectedSprite && activeType !== null) resetAllGroups();
       tooltipEl.classList.add('hidden');
+      _crossTarget = 0;
+      _snapCursor.style.display = 'none'; _snapX = null; _snapY = null;
       return;
     }
 
-    pointer.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
-    pointer.y = -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
+    // Snap: DISSECTED mode only — find the nearest data sprite and redirect the raycast toward it
+    const _snap = getDissected?.() ? findSnapSprite(event.clientX, event.clientY, canvasRect) : null;
+    if (_snap) {
+      _snapX = _snap.px; _snapY = _snap.py;
+      _snapCursor.style.display = 'block';
+      _snapCursor.style.left = `${_snapX}px`;
+      _snapCursor.style.top = `${_snapY}px`;
+      if (viewerCanvas) viewerCanvas.style.cursor = 'none';
+    } else {
+      _snapX = null; _snapY = null;
+      _snapCursor.style.display = 'none';
+    }
+
+    const effX = _snapX ?? event.clientX;
+    const effY = _snapY ?? event.clientY;
+    pointer.x = ((effX - canvasRect.left) / canvasRect.width) * 2 - 1;
+    pointer.y = -((effY - canvasRect.top) / canvasRect.height) * 2 + 1;
 
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
@@ -203,7 +284,7 @@ export function setupTooltips(camera, scene, tooltipEl) {
     const canvas = viewerCanvas;
 
     if (hit) {
-      if (canvas) canvas.style.cursor = 'pointer';
+      if (canvas && !_snapX) canvas.style.cursor = 'crosshair';
       const d = hit.object.userData;
 
       // Dim / highlight groups on hover – only when no specific point is selected
@@ -246,12 +327,30 @@ export function setupTooltips(camera, scene, tooltipEl) {
       tooltipEl.style.left = `${event.clientX + 14}px`;
       tooltipEl.style.top = `${event.clientY + 14}px`;
       tooltipEl.classList.remove('hidden');
+
+      // Crosshair lines through the hovered point — DISSECTED mode only
+      if (modelBox && getDissected?.()) {
+        const wp = new THREE.Vector3();
+        hit.object.getWorldPosition(wp);
+        // X-axis line: spans model bounding box in X, locked to sprite's Y and Z
+        _xPos[0] = modelBox.min.x; _xPos[1] = wp.y; _xPos[2] = wp.z;
+        _xPos[3] = modelBox.max.x; _xPos[4] = wp.y; _xPos[5] = wp.z;
+        _xGeom.attributes.position.needsUpdate = true;
+        // Z-axis line: spans model bounding box in Z, locked to sprite's Y and X
+        _zPos[0] = wp.x; _zPos[1] = wp.y; _zPos[2] = modelBox.min.z;
+        _zPos[3] = wp.x; _zPos[4] = wp.y; _zPos[5] = modelBox.max.z;
+        _zGeom.attributes.position.needsUpdate = true;
+        _crossTarget = CROSS_OPACITY;
+      } else {
+        _crossTarget = 0;
+      }
     } else {
-      if (canvas) canvas.style.cursor = '';
+      if (canvas && !_snapX) canvas.style.cursor = '';
       if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; }
       // Only reset group opacity when no point is selected
       if (!selectedSprite && activeType !== null) resetAllGroups();
       tooltipEl.classList.add('hidden');
+      _crossTarget = 0;
     }
   });
 
@@ -269,10 +368,17 @@ export function setupTooltips(camera, scene, tooltipEl) {
     _pointerIsDown = true;
     pointerDownPos.x = e.clientX;
     pointerDownPos.y = e.clientY;
+    // Capture the current snap position so pointerup can use it for the click raycast
+    _clickSnapX = _snapX; _clickSnapY = _snapY;
     // Hide tooltip immediately on press so it doesn't linger during drag
     tooltipEl.classList.add('hidden');
+    _snapCursor.style.display = 'none';
   });
-  window.addEventListener('pointercancel', () => { _pointerIsDown = false; });
+  window.addEventListener('pointercancel', () => {
+    _pointerIsDown = false;
+    _snapCursor.style.display = 'none';
+    _snapX = null; _snapY = null;
+  });
 
   window.addEventListener('pointerup', (e) => {
     _pointerIsDown = false;
@@ -316,9 +422,12 @@ export function setupTooltips(camera, scene, tooltipEl) {
     // Click is outside the 3D canvas (e.g. on the detail panel gap)
     if (e.clientX > clickRect.right) return;
 
+    // Use the snap position captured at pointerdown so clicks hit the snapped sprite
+    const cx = _clickSnapX ?? e.clientX;
+    const cy = _clickSnapY ?? e.clientY;
     const clickPtr = new THREE.Vector2(
-      ((e.clientX - clickRect.left) / clickRect.width) * 2 - 1,
-      -((e.clientY - clickRect.top) / clickRect.height) * 2 + 1
+      ((cx - clickRect.left) / clickRect.width) * 2 - 1,
+      -((cy - clickRect.top) / clickRect.height) * 2 + 1
     );
     raycaster.setFromCamera(clickPtr, camera);
     const hits = raycaster.intersectObjects(scene.children, true);

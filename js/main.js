@@ -132,6 +132,7 @@ async function init() {
 
     // Callback assigned once the dark-mode engine is ready (see below)
     let _triggerMode = null;
+    let isDissected = false;
 
     // 5. Dissected view: explode dataset groups vertically + snap camera home
     {
@@ -272,6 +273,9 @@ async function init() {
           // Don't change 3D state when just opening an overlay
           if (isCredits || isAbout) return;
 
+          // Track DISSECTED mode so crosshair lines know when to appear
+          isDissected = (name === 'dissected');
+
           // Show collage drawings when in COLLAGE mode, hide otherwise
           if (name === 'collage') { collage.show(); } else { collage.hide(); }
 
@@ -291,18 +295,32 @@ async function init() {
             goHome();
             setExplode(explodeGroups.map((_, i) => (i + 1) * 400));
             setZoom(homeZoom * 0.75);
+            // Dim scene labels to half opacity — double-RAF ensures this runs
+            // after fadeOverlays' single-RAF restore so the transition animates correctly
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              for (const label of sceneLabels) {
+                label.element.style.opacity = '0.5';
+              }
+            }));
           } else {
             if (name === 'recorded' || name === 'remediated') goHome();
             setExplode(explodeGroups.map(() => 0));
             setZoom(homeZoom);
             _triggerMode?.(name === 'remediated');
+            // Restore labels to full opacity when leaving dissected —
+            // fadeOverlays(true) above already sets the CSS transition, so this animates
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              for (const label of sceneLabels) {
+                label.element.style.opacity = '1';
+              }
+            }));
           }
         });
       });
     }
 
     // 6. Tooltips via raycasting
-    const tickSprites = setupTooltips(camera, scene, tooltipEl);
+    const tickSprites = setupTooltips(camera, scene, tooltipEl, modelBox, () => isDissected);
     setTickSprites(tickSprites);
 
     // 6. Done!
