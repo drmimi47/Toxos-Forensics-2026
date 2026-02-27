@@ -167,9 +167,18 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
     group.add(sprite);
   });
 
+  // Find the leftmost and rightmost sprites by scene X — used by DISSECTED annotations
+  // to pick the shortest-path edge point based on which side the text panel is on.
+  let edgeSpriteLeft = null, edgeSpriteRight = null;
+  let minX = Infinity, maxX = -Infinity;
+  for (const child of group.children) {
+    if (child.position.x < minX) { minX = child.position.x; edgeSpriteLeft  = child; }
+    if (child.position.x > maxX) { maxX = child.position.x; edgeSpriteRight = child; }
+  }
+
   scene.add(group);
   console.log(`[csvLoader] ${label}: ${group.children.length} points loaded from ${csvPath}`);
-  return { group, rows, material, lightTex, darkTex };
+  return { group, rows, material, lightTex, darkTex, edgeSpriteLeft, edgeSpriteRight };
 }
 
 /**

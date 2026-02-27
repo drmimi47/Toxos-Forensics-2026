@@ -133,6 +133,95 @@ async function init() {
     // Callback assigned once the dark-mode engine is ready (see below)
     let _triggerMode = null;
     let isDissected = false;
+    let _currentMode = 'recorded'; // tracks active 3D submenu; matches HTML initial .active item
+
+    // DISSECTED annotation system: SVG leader lines connect each dataset's extreme
+    // data point (projected live each frame) to a fixed text panel on the left or right
+    // side of the viewport. Panels alternate sides as datasets are added so each side
+    // fills evenly. The edge sprite used is the one on the SAME side as the panel
+    // (right panel → rightmost point, left panel → leftmost point) so the line takes
+    // the shortest path. Point B is the inner edge of the text, facing the model.
+    const _dissectedSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    _dissectedSvg.id = 'diss-svg';
+    document.body.appendChild(_dissectedSvg);
+
+    const _dissectedPanelsRight = document.createElement('div');
+    _dissectedPanelsRight.id = 'diss-panels-right';
+    document.body.appendChild(_dissectedPanelsRight);
+
+    const _dissectedPanelsLeft = document.createElement('div');
+    _dissectedPanelsLeft.id = 'diss-panels-left';
+    document.body.appendChild(_dissectedPanelsLeft);
+
+    // Convenience array for bulk opacity changes
+    const _dissEls = [_dissectedSvg, _dissectedPanelsRight, _dissectedPanelsLeft];
+
+    const _annData = [
+      { result: csvResults.cso,               name: 'CSO',   color: '#00ffff', lorem: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.' },
+      { result: csvResults.npdes,             name: 'NPDES', color: '#ff3800', lorem: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.' },
+      { result: csvResults.rcra_2263_clipped, name: 'RCRA',  color: '#515b28', lorem: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.' },
+    ].flatMap(({ result, name, color, lorem }, i) => {
+      // Alternate: even index → right side, odd index → left side
+      const side = i % 2 === 0 ? 'right' : 'left';
+      // Use the edge sprite on the same side as the text panel for the shortest line
+      const sprite = side === 'right' ? result?.edgeSpriteRight : result?.edgeSpriteLeft;
+      if (!sprite) return [];
+
+      // SVG leader line (Point A → Point B)
+      const svgLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      svgLine.setAttribute('stroke', color);
+      svgLine.setAttribute('stroke-opacity', '0.7');
+      svgLine.setAttribute('stroke-width', '1');
+      _dissectedSvg.appendChild(svgLine);
+
+      // Small dot at Point A (marks the chosen data point on the 3D side)
+      const svgDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      svgDot.setAttribute('r', '2.5');
+      svgDot.setAttribute('fill', color);
+      _dissectedSvg.appendChild(svgDot);
+
+      // Text panel appended to the correct side container
+      const panel = document.createElement('div');
+      panel.className = 'diss-panel';
+      const nameEl = document.createElement('p');
+      nameEl.className = 'diss-name';
+      nameEl.style.color = color;
+      nameEl.textContent = name;
+      const textEl = document.createElement('p');
+      textEl.className = 'diss-text';
+      textEl.textContent = lorem;
+      panel.appendChild(nameEl);
+      panel.appendChild(textEl);
+      (side === 'right' ? _dissectedPanelsRight : _dissectedPanelsLeft).appendChild(panel);
+
+      return [{ sprite, svgLine, svgDot, nameEl, side }];
+    });
+
+    // Per-frame: project each edge sprite's world position to screen coords and
+    // update the SVG line so it always runs from Point A → Point B.
+    // Point B is the INNER edge of the text (the edge facing the 3D model):
+    //   right panel → left edge of name   left panel → right edge of name
+    let _dissLineRafId = null;
+    const _dissVec = new THREE.Vector3();
+    function _tickDissLines() {
+      if (!isDissected) { _dissLineRafId = null; return; }
+      const rect = renderer.domElement.getBoundingClientRect();
+      for (const ann of _annData) {
+        ann.sprite.getWorldPosition(_dissVec);
+        const n = _dissVec.clone().project(camera);
+        // Point A: live screen projection of the 3D edge sprite
+        const ax = rect.left + (n.x *  0.5 + 0.5) * rect.width;
+        const ay = rect.top  + (n.y * -0.5 + 0.5) * rect.height;
+        // Point B: inner edge of the dataset name text, vertical centre
+        const nr = ann.nameEl.getBoundingClientRect();
+        const bx = ann.side === 'right' ? nr.left : nr.right;
+        const by = nr.top + nr.height / 2;
+        ann.svgLine.setAttribute('x1', ax); ann.svgLine.setAttribute('y1', ay);
+        ann.svgLine.setAttribute('x2', bx); ann.svgLine.setAttribute('y2', by);
+        ann.svgDot.setAttribute('cx', ax);  ann.svgDot.setAttribute('cy', ay);
+      }
+      _dissLineRafId = requestAnimationFrame(_tickDissLines);
+    }
 
     // 5. Dissected view: explode dataset groups vertically + snap camera home
     {
@@ -273,46 +362,53 @@ async function init() {
           // Don't change 3D state when just opening an overlay
           if (isCredits || isAbout) return;
 
+          // Already in this 3D submenu — ignore re-clicks
+          if (name === _currentMode) return;
+          _currentMode = name;
+
           // Track DISSECTED mode so crosshair lines know when to appear
           isDissected = (name === 'dissected');
 
           // Show collage drawings when in COLLAGE mode, hide otherwise
           if (name === 'collage') { collage.show(); } else { collage.hide(); }
 
-          // Disable LMB rotation in COLLAGE (top-down pan mode); restore otherwise
+          // Disable LMB rotation in COLLAGE (top-down pan mode) and DISSECTED; restore otherwise
           const isCollage = name === 'collage';
-          controls.mouseButtons.LEFT = isCollage ? null : THREE.MOUSE.ROTATE;
+          controls.mouseButtons.LEFT  = (isCollage || isDissected) ? null : THREE.MOUSE.ROTATE;
+          controls.mouseButtons.RIGHT = isDissected ? null : THREE.MOUSE.PAN;
+          controls.enableZoom         = !isDissected;
           document.body.classList.toggle('collage-mode', isCollage);
+          document.body.classList.toggle('dissected-mode', isDissected);
 
           // Fatberg: bare 3D model only — fade all data overlays out/in, reset camera
           fadeOverlays(!isFatberg);
 
-          if (isFatberg) { goFatbergView(); setZoom(homeZoom); _triggerMode?.(false); return; }
+          if (isFatberg) { goFatbergView(); setZoom(homeZoom); _triggerMode?.(false); for (const el of _dissEls) el.style.opacity = '0'; return; }
           // set * 0.x multiplier to lower to zoom out more in collage
-          if (name === 'collage') { goTopDown(); setExplode(explodeGroups.map(() => 0)); setZoom(homeZoom * 0.4); return; }
+          if (name === 'collage') { goTopDown(); setExplode(explodeGroups.map(() => 0)); setZoom(homeZoom * 0.4); for (const el of _dissEls) el.style.opacity = '0'; return; }
 
           if (name === 'dissected') {
             goHome();
-            setExplode(explodeGroups.map((_, i) => (i + 1) * 400));
-            setZoom(homeZoom * 0.75);
-            // Dim scene labels to half opacity — double-RAF ensures this runs
-            // after fadeOverlays' single-RAF restore so the transition animates correctly
+            setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
+            setZoom(homeZoom * 0.70);
+            //abaove controls the spacing of the data sets and the extent of the camera zoom in the DISSECTED submenu. 
+            // Start SVG line loop immediately so positions are ready when elements fade in
+            if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
+            // Dim scene labels and fade in annotation panels — double-RAF ensures this
+            // runs after fadeOverlays' single-RAF restore so transitions animate correctly
             requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const label of sceneLabels) {
-                label.element.style.opacity = '0.5';
-              }
+              for (const label of sceneLabels) label.element.style.opacity = '0.5';
+              for (const el of _dissEls) el.style.opacity = '1';
             }));
           } else {
             if (name === 'recorded' || name === 'remediated') goHome();
             setExplode(explodeGroups.map(() => 0));
             setZoom(homeZoom);
             _triggerMode?.(name === 'remediated');
-            // Restore labels to full opacity when leaving dissected —
-            // fadeOverlays(true) above already sets the CSS transition, so this animates
+            for (const el of _dissEls) el.style.opacity = '0';
+            // _tickDissLines auto-stops on next tick via isDissected=false guard
             requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const label of sceneLabels) {
-                label.element.style.opacity = '1';
-              }
+              for (const label of sceneLabels) label.element.style.opacity = '1';
             }));
           }
         });

@@ -190,6 +190,7 @@ export function createViewer() {
 
   // Shared handler for both desktop dblclick and mobile double-tap.
   function handleDoubleActivate() {
+    if (document.body.classList.contains('dissected-mode')) return;
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
 

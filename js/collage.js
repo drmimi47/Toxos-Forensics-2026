@@ -20,9 +20,9 @@ import * as THREE from 'three';
 
 const BASE_PATH = './assets/images/';
 
-const GAP         = 600;   // world units: model edge → plane inner edge
-const CORNER_GAP  = 800;   // world units: clear space at each plane corner
-const FADE_MS     = 320;   // fade duration in ms
+const GAP         = 510;   // world units: model edge → plane inner edge
+const CORNER_GAP  = 300;   // world units: clear space at each plane corner
+const FADE_MS     = 680;   // fade duration in ms
 
 /**
  * Image sources in [N, E, S, W] layout order.
