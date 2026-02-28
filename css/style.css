@@ -353,6 +353,25 @@ body {
   min-width: 190px;
   background: transparent;
 }
+body.collage-mode #legend,
+body.fatberg-mode #legend,
+body.dissected-mode #legend {
+  pointer-events: none;
+}
+body.collage-mode #legend .legend-title,
+body.collage-mode #legend .legend-dot,
+body.collage-mode #legend .legend-label,
+body.collage-mode #legend .legend-count,
+body.fatberg-mode #legend .legend-title,
+body.fatberg-mode #legend .legend-dot,
+body.fatberg-mode #legend .legend-label,
+body.fatberg-mode #legend .legend-count,
+body.dissected-mode #legend .legend-title,
+body.dissected-mode #legend .legend-dot,
+body.dissected-mode #legend .legend-label,
+body.dissected-mode #legend .legend-count {
+  opacity: 0;
+}
 
 .legend-title {
   font-family: var(--font-mono);
@@ -841,6 +860,18 @@ body.dark .dp-meta-grid {
   display: block;
 }
 
+/* Pulse animation: briefly flashes a dimmed hint to signal the action is disabled.
+   The animation overrides the transition on the element while it runs, then
+   the element returns to its dimmed opacity (0.38) when the class is removed. */
+@keyframes ctrl-disabled-pulse {
+  0%   { opacity: 0.38; }
+  20%  { opacity: 0.92; }
+  100% { opacity: 0.38; }
+}
+.ctrl-pulse {
+  animation: ctrl-disabled-pulse 0.48s ease-out;
+}
+
 /* LMB rotate hint dims when rotation is disabled in COLLAGE or DISSECTED mode */
 .ctrl-lmb {
   transition: opacity 0.3s ease;
@@ -860,6 +891,15 @@ body.dissected-mode .ctrl-rmb,
 body.dissected-mode .ctrl-scroll,
 body.dissected-mode .ctrl-dblclick {
   opacity: 0.38;
+}
+
+/* SCROLL TILT MODEL hint: hidden normally, fades in only in DISSECTED mode */
+.ctrl-scroll-tilt {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+body.dissected-mode .ctrl-scroll-tilt {
+  opacity: 1;
 }
 
 /* ===== CSS2D Scene Labels ===== */
@@ -901,6 +941,7 @@ body.dissected-mode .ctrl-dblclick {
   /* slowed animation: originally 0.22s, made ~1.8x slower -> ~0.4s */
   transition:
     transform 0.4s cubic-bezier(0.5, 1.7, 0.5, 1),
+    filter  0.5s ease,
     opacity 0.32s;
   transform-origin: center center;
 }
@@ -917,6 +958,35 @@ body.panel-open .scene-image img {
   font-size: 12px;
   color: var(--text-dim);
   text-align: center;
+}
+
+/* ── Progressive image load blur ─────────────────────────────────────────────
+   Applied by JS before src is set; removed onload / onerror.
+   Works with both .scene-image img (3D scene) and .about-image (ABOUT overlay).
+   The host element must have a `filter` in its transition for a smooth unblur. */
+.img-loading {
+  filter: blur(14px) brightness(0.6) !important;
+  opacity: 0.35 !important;
+}
+
+/* Images inside the ABOUT overlay */
+.about-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+.about-image {
+  flex: 1 1 calc(50% - 5px);  /* two-per-row; stacks to one-per-row when narrow */
+  min-width: 160px;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid rgba(128,128,128,0.18);
+  display: block;
+  object-fit: cover;
+  transition: filter 0.5s ease, opacity 0.45s ease;
 }
 
 /* ===== DISSECTED dataset annotations ===== */
@@ -957,7 +1027,22 @@ body.panel-open .scene-image img {
 #diss-panels-right { right: 28px; }
 #diss-panels-left  { left:  28px; }
 
-.diss-panel { text-align: left; }
+.diss-panel {
+  text-align: left;
+  pointer-events: all; /* re-enable clicks; parent container has pointer-events: none */
+  cursor: pointer;
+}
+
+/* Dim the panel when its dataset is toggled off (mirrors legend-item.disabled) */
+.diss-panel.disabled .diss-name,
+.diss-panel.disabled .diss-text {
+  opacity: 0.2;
+  transition: opacity 0.2s ease;
+}
+.diss-panel .diss-name,
+.diss-panel .diss-text {
+  transition: opacity 0.2s ease;
+}
 
 .diss-name {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;

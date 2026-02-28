@@ -85,6 +85,25 @@
       <p class="about-body">Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint.</p>
       <p class="about-body">Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur? Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat.</p>
       <p class="about-body">Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam.</p>
+      <!-- ── ABOUT IMAGES ──────────────────────────────────────────────────────
+           Drop JPG or PNG files into ./assets/images/ and update the src paths
+           below.  Each <img> starts blurred (class="about-image img-loading")
+           and sharpens automatically once decoded.  Add or remove <img> tags
+           freely — the flex grid wraps to two-per-row at normal widths and
+           one-per-row on narrow screens.
+           ─────────────────────────────────────────────────────────────────── -->
+      <!-- <div class="about-images">
+        <img class="about-image img-loading"
+             src="./assets/images/about-1.jpg"
+             alt="About image 1"
+             onload="this.classList.remove('img-loading')"
+             onerror="this.classList.remove('img-loading')">
+        <img class="about-image img-loading"
+             src="./assets/images/about-2.png"
+             alt="About image 2"
+             onload="this.classList.remove('img-loading')"
+             onerror="this.classList.remove('img-loading')">
+      </div> -->
       <p class="credits-role section-gap">TOWARD REMEDIATION</p>
       <p class="about-body">instagram@toxos_x</p>
     </div>
@@ -118,7 +137,8 @@
         <span class="ctrl-rmb"><span class="key">RMB</span> Pan</span>&ensp;
         <span class="ctrl-scroll"><span class="key">Scroll</span> Zoom</span>&ensp;
         <span class="ctrl-dblclick"><span class="key">DblClick</span> Top View</span>&ensp;
-        <span class="key">ESC</span> Close Panels
+        <span class="key">ESC</span> Close Panels&ensp;
+        <span class="ctrl-scroll-tilt"><span class="key">Scroll (Bounded)</span> Tilt Model</span>
       </p>
     </div>
     <div class="footer-meta">
@@ -135,7 +155,7 @@
       const hh  = String(d.getHours()).padStart(2, '0');
       const mm  = String(d.getMinutes()).padStart(2, '0');
       const el  = document.getElementById('last-updated');
-      if (el) el.textContent = `Last Updated ${mon}-${day}-${hh}:${mm}`;
+      if (el) el.textContent = `Last Updated ${mon} ${day} ${hh}:${mm}`;
     }).catch(() => {});
   </script>
 

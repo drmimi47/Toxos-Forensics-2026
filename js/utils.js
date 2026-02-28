@@ -33,13 +33,16 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
   let hoveredSprite = null;           // currently hovered sprite
   let selectedSprite = null;          // sprite whose detail card is open
 
-  // Crosshair lines (X and Z axes through hovered data point, DISSECTED mode only)
+  // Crosshair lines (X, Z axes + downward Y drop line through hovered point, DISSECTED only)
   const _xPos = new Float32Array(6);
   const _zPos = new Float32Array(6);
+  const _yPos = new Float32Array(6); // vertical drop: sprite → model ground (downward only)
   const _xGeom = new THREE.BufferGeometry();
   const _zGeom = new THREE.BufferGeometry();
+  const _yGeom = new THREE.BufferGeometry();
   _xGeom.setAttribute('position', new THREE.BufferAttribute(_xPos, 3));
   _zGeom.setAttribute('position', new THREE.BufferAttribute(_zPos, 3));
+  _yGeom.setAttribute('position', new THREE.BufferAttribute(_yPos, 3));
   const _crossMat = new THREE.LineBasicMaterial({
     color: 0xffffff,          // white source — blending inverts whatever is underneath
     transparent: true,        // rendered in transparent pass so it composites over the scene
@@ -53,9 +56,11 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
   });
   const _xLine = new THREE.Line(_xGeom, _crossMat);
   const _zLine = new THREE.Line(_zGeom, _crossMat);
+  const _yLine = new THREE.Line(_yGeom, _crossMat);
   _xLine.renderOrder = 1002;
   _zLine.renderOrder = 1002;
-  scene.add(_xLine, _zLine);
+  _yLine.renderOrder = 1002;
+  scene.add(_xLine, _zLine, _yLine);
   let _crossTarget = 0;
   const CROSS_OPACITY = 1;
 
@@ -231,6 +236,7 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
     // Crosshair lines: inversion blending needs no color sync — toggle visibility for instant show/hide
     _xLine.visible = _crossTarget > 0;
     _zLine.visible = _crossTarget > 0;
+    _yLine.visible = _crossTarget > 0;
   }
 
   const viewerCanvas = document.querySelector('#viewer-container canvas');
@@ -340,6 +346,11 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
         _zPos[0] = wp.x; _zPos[1] = wp.y; _zPos[2] = modelBox.min.z;
         _zPos[3] = wp.x; _zPos[4] = wp.y; _zPos[5] = modelBox.max.z;
         _zGeom.attributes.position.needsUpdate = true;
+        // Y drop line: straight down from the sprite to the model's ground plane
+        // (downward only — does not extend above the sprite)
+        _yPos[0] = wp.x; _yPos[1] = wp.y;           _yPos[2] = wp.z;
+        _yPos[3] = wp.x; _yPos[4] = modelBox.min.y;  _yPos[5] = wp.z;
+        _yGeom.attributes.position.needsUpdate = true;
         _crossTarget = CROSS_OPACITY;
       } else {
         _crossTarget = 0;

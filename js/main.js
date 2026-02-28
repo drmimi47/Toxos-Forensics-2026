@@ -40,7 +40,7 @@ async function init() {
   setProgress(5, "Setting up scene");
 
   // 1. Spin up the 3D viewer
-  const { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goFatbergView, goTopDown } = createViewer();
+  const { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt } = createViewer();
   const tooltipEl = document.getElementById("tooltip");
 
   try {
@@ -157,27 +157,51 @@ async function init() {
     const _dissEls = [_dissectedSvg, _dissectedPanelsRight, _dissectedPanelsLeft];
 
     const _annData = [
-      { result: csvResults.cso,               name: 'CSO',   color: '#00ffff', lorem: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.' },
-      { result: csvResults.npdes,             name: 'NPDES', color: '#ff3800', lorem: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.' },
-      { result: csvResults.rcra_2263_clipped, name: 'RCRA',  color: '#515b28', lorem: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.' },
-    ].flatMap(({ result, name, color, lorem }, i) => {
+      // ── TERMINUS POINT FINE-TUNING ──────────────────────────────────────────
+      // terminusIndex: the 1-based point number shown in the detail side-panel
+      //   (e.g. "42 / 71" → set terminusIndex: 42).
+      // Set to null to auto-pick the leftmost or rightmost point depending on
+      // which side the text panel is on (right panel → rightmost, left → leftmost).
+      //
+      // Point counts for reference:
+      //   CSO  — 71 total   (terminusIndex range: 1 – 71)
+      //   NPDES — 91 total  (terminusIndex range: 1 – 91)
+      //   RCRA  — ~5383 total (terminusIndex range: 1 – 5383)
+      // ────────────────────────────────────────────────────────────────────────
+      // color values reference CSS custom properties so they automatically adapt
+      // to light/dark mode without any JS involvement (see :root / body.dark in style.css).
+      { result: csvResults.cso,               name: 'CSO',   color: 'var(--cso-color)',   terminusIndex: null, lorem: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.' },
+      { result: csvResults.npdes,             name: 'NPDES', color: 'var(--npdes-color)', terminusIndex: null, lorem: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.' },
+      { result: csvResults.rcra_2263_clipped, name: 'RCRA',  color: 'var(--rcra-color)',  terminusIndex: 907, lorem: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.' },
+    ].flatMap(({ result, name, color, terminusIndex, lorem }, i) => {
       // Alternate: even index → right side, odd index → left side
       const side = i % 2 === 0 ? 'right' : 'left';
-      // Use the edge sprite on the same side as the text panel for the shortest line
-      const sprite = side === 'right' ? result?.edgeSpriteRight : result?.edgeSpriteLeft;
+
+      // Resolve terminus sprite:
+      //   • terminusIndex set  → use the exact sprite at that 1-based position in the
+      //     dataset (same numbering shown in the detail panel).  Falls back to the
+      //     auto edge sprite if the index is out of range.
+      //   • terminusIndex null → auto-pick the edge sprite on the same side as the
+      //     text panel so the leader line takes the shortest path to the model edge.
+      const autoSprite = side === 'right' ? result?.edgeSpriteRight : result?.edgeSpriteLeft;
+      const sprite = (terminusIndex != null)
+        ? (result?.group?.children[terminusIndex - 1] ?? autoSprite)
+        : autoSprite;
       if (!sprite) return [];
 
-      // SVG leader line (Point A → Point B)
+      // SVG leader line (Point A → Point B).
+      // stroke is set via style (not attribute) so CSS custom properties resolve correctly.
       const svgLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      svgLine.setAttribute('stroke', color);
+      svgLine.style.stroke = color;
       svgLine.setAttribute('stroke-opacity', '0.7');
       svgLine.setAttribute('stroke-width', '1');
       _dissectedSvg.appendChild(svgLine);
 
-      // Small dot at Point A (marks the chosen data point on the 3D side)
+      // Small dot at Point A (marks the chosen data point on the 3D side).
+      // fill is set via style so CSS custom properties resolve correctly.
       const svgDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       svgDot.setAttribute('r', '2.5');
-      svgDot.setAttribute('fill', color);
+      svgDot.style.fill = color;
       _dissectedSvg.appendChild(svgDot);
 
       // Text panel appended to the correct side container
@@ -193,6 +217,24 @@ async function init() {
       panel.appendChild(nameEl);
       panel.appendChild(textEl);
       (side === 'right' ? _dissectedPanelsRight : _dissectedPanelsLeft).appendChild(panel);
+
+      // Click-to-toggle: clicking the panel hides / shows that dataset, matching
+      // the same interaction as clicking a legend item in RECORDED mode.
+      let dissVisible = true;
+      panel.addEventListener('click', () => {
+        dissVisible = !dissVisible;
+        // Toggle the 3D sprite group
+        if (result?.group) result.group.visible = dissVisible;
+        // Dim the panel text to signal the hidden state
+        panel.classList.toggle('disabled', !dissVisible);
+        // Dim the SVG leader line and dot proportionally
+        svgLine.setAttribute('stroke-opacity', dissVisible ? '0.7' : '0.18');
+        svgDot.setAttribute('opacity',          dissVisible ? '1'   : '0.18');
+        // Close the detail card if it is showing a point from this dataset
+        if (!dissVisible && new RegExp(name, 'i').test(getDetailType())) {
+          closeDetail();
+        }
+      });
 
       return [{ sprite, svgLine, svgDot, nameEl, side }];
     });
@@ -212,9 +254,16 @@ async function init() {
         // Point A: live screen projection of the 3D edge sprite
         const ax = rect.left + (n.x *  0.5 + 0.5) * rect.width;
         const ay = rect.top  + (n.y * -0.5 + 0.5) * rect.height;
-        // Point B: inner edge of the dataset name text, vertical centre
-        const nr = ann.nameEl.getBoundingClientRect();
-        const bx = ann.side === 'right' ? nr.left : nr.right;
+        // Point B: inner edge of the actual text glyphs (not the full element box).
+        // A Range measures the tight rect around the rendered characters, so
+        // nr.left / nr.right land exactly on the first / last letter edge
+        // rather than on the paragraph container's layout boundary.
+        const range = document.createRange();
+        range.selectNodeContents(ann.nameEl);
+        const nr = range.getBoundingClientRect();
+        // TEXT_GAP: pixels of breathing room between the line tip and the glyph edge.
+        const TEXT_GAP = 6;
+        const bx = ann.side === 'right' ? nr.left - TEXT_GAP : nr.right + TEXT_GAP;
         const by = nr.top + nr.height / 2;
         ann.svgLine.setAttribute('x1', ax); ann.svgLine.setAttribute('y1', ay);
         ann.svgLine.setAttribute('x2', bx); ann.svgLine.setAttribute('y2', by);
@@ -369,6 +418,10 @@ async function init() {
           // Track DISSECTED mode so crosshair lines know when to appear
           isDissected = (name === 'dissected');
 
+          // Tilt must be toggled here — before any early returns — so switching from
+          // DISSECTED → COLLAGE / FATBERG correctly disables scroll-to-tilt.
+          enableDissectedTilt(isDissected);
+
           // Show collage drawings when in COLLAGE mode, hide otherwise
           if (name === 'collage') { collage.show(); } else { collage.hide(); }
 
@@ -379,6 +432,11 @@ async function init() {
           controls.enableZoom         = !isDissected;
           document.body.classList.toggle('collage-mode', isCollage);
           document.body.classList.toggle('dissected-mode', isDissected);
+          document.body.classList.toggle('fatberg-mode', isFatberg);
+
+          // Cancel any in-flight or completed pulse animations so no hint carries
+          // over a stale opacity into the incoming submenu's fresh state.
+          document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
 
           // Fatberg: bare 3D model only — fade all data overlays out/in, reset camera
           fadeOverlays(!isFatberg);
@@ -388,16 +446,17 @@ async function init() {
           if (name === 'collage') { goTopDown(); setExplode(explodeGroups.map(() => 0)); setZoom(homeZoom * 0.4); for (const el of _dissEls) el.style.opacity = '0'; return; }
 
           if (name === 'dissected') {
-            goHome();
+            goDissectedView(); // shifts camera+target upward so model sits near bottom of screen
             setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
             setZoom(homeZoom * 0.70);
-            //abaove controls the spacing of the data sets and the extent of the camera zoom in the DISSECTED submenu. 
+            //abaove controls the spacing of the data sets and the extent of the camera zoom in the DISSECTED submenu.
             // Start SVG line loop immediately so positions are ready when elements fade in
             if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
             // Dim scene labels and fade in annotation panels — double-RAF ensures this
             // runs after fadeOverlays' single-RAF restore so transitions animate correctly
             requestAnimationFrame(() => requestAnimationFrame(() => {
               for (const label of sceneLabels) label.element.style.opacity = '0.5';
+              for (const img   of sceneImages)  img.element.style.opacity   = '0.5';
               for (const el of _dissEls) el.style.opacity = '1';
             }));
           } else {
@@ -409,6 +468,7 @@ async function init() {
             // _tickDissLines auto-stops on next tick via isDissected=false guard
             requestAnimationFrame(() => requestAnimationFrame(() => {
               for (const label of sceneLabels) label.element.style.opacity = '1';
+              for (const img   of sceneImages)  img.element.style.opacity   = '1';
             }));
           }
         });
@@ -418,6 +478,41 @@ async function init() {
     // 6. Tooltips via raycasting
     const tickSprites = setupTooltips(camera, scene, tooltipEl, modelBox, () => isDissected);
     setTickSprites(tickSprites);
+
+    // 7. Disabled-control pulse feedback
+    // When the user triggers an input that is currently disabled, the corresponding
+    // dimmed hint in the footer briefly flashes to remind them it's inactive.
+    function pulseCtrl(selector) {
+      const el = document.querySelector(selector);
+      if (!el) return;
+      el.classList.remove('ctrl-pulse');
+      void el.offsetWidth; // force reflow so the animation restarts on rapid repeats
+      el.classList.add('ctrl-pulse');
+    }
+
+    const _canvas = renderer.domElement;
+
+    // LMB rotate — disabled in COLLAGE and DISSECTED
+    _canvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      if (document.body.classList.contains('collage-mode') ||
+          document.body.classList.contains('dissected-mode')) {
+        pulseCtrl('.ctrl-lmb');
+      }
+    });
+
+    // RMB pan — disabled in DISSECTED
+    _canvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 2) return;
+      if (document.body.classList.contains('dissected-mode')) pulseCtrl('.ctrl-rmb');
+    });
+
+    // Scroll zoom — disabled in DISSECTED (scroll tilts instead; no pulse since scroll IS functional)
+
+    // DblClick top view — disabled in DISSECTED
+    _canvas.addEventListener('dblclick', () => {
+      if (document.body.classList.contains('dissected-mode')) pulseCtrl('.ctrl-dblclick');
+    });
 
     // 6. Done!
     hidePreloader();

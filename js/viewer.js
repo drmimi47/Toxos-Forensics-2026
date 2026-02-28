@@ -237,6 +237,51 @@ export function createViewer() {
   // Mobile: custom event dispatched by utils.js double-tap detector
   window.addEventListener('double-tap', handleDoubleActivate);
 
+  // ---- DISSECTED scroll-to-tilt system ----
+  // Scroll wheel changes the camera's polar angle (elevation) while keeping
+  // azimuth fixed — effectively tilting the model between isometric and top-down
+  // without any horizontal rotation.
+  let _tiltActive        = false;
+  let _tiltNeedsSnapshot = false; // re-snapshot after goDissectedView anim settles
+  let _tiltCurrentTheta  = 0;    // current polar angle from Y axis (radians)
+  let _tiltTargetTheta   = 0;    // desired polar angle (scrolled toward)
+  let _tiltPhi           = 0;    // fixed azimuth (radians)
+  let _tiltR             = 0;    // fixed camera-to-target distance
+
+  const TILT_THETA_MIN = 0.05;   // ~3° from vertical  (near top-down)
+  const TILT_THETA_MAX = 1.45;   // ~83° from vertical (near horizon)
+  const TILT_SPEED     = 0.0007; // radians per deltaY pixel (~4° per mouse notch)
+  const TILT_LERP      = 0.10;   // smoothing per frame
+
+  function _snapshotTilt() {
+    const offset = camera.position.clone().sub(controls.target);
+    _tiltR            = offset.length();
+    _tiltCurrentTheta = Math.acos(THREE.MathUtils.clamp(offset.y / _tiltR, -1, 1));
+    _tiltPhi          = Math.atan2(offset.x, offset.z);
+    _tiltTargetTheta  = _tiltCurrentTheta;
+  }
+
+  function _onTiltWheel(e) {
+    if (!_tiltActive) return;
+    e.preventDefault();
+    let delta = e.deltaY;
+    if (e.deltaMode === 1) delta *= 20;   // line mode → pixels
+    if (e.deltaMode === 2) delta *= 600;  // page mode → pixels
+    _tiltTargetTheta = THREE.MathUtils.clamp(
+      _tiltTargetTheta + delta * TILT_SPEED,
+      TILT_THETA_MIN,
+      TILT_THETA_MAX
+    );
+  }
+  renderer.domElement.addEventListener('wheel', _onTiltWheel, { passive: false });
+
+  /** Enable or disable DISSECTED scroll-to-tilt. Call with true on DISSECTED enter,
+   *  false on exit. The snapshot is deferred until goDissectedView() animation settles. */
+  function enableDissectedTilt(enable) {
+    _tiltActive = enable;
+    if (enable) _tiltNeedsSnapshot = true;
+  }
+
   function easeInOutQuart(t) {
     return t < 0.5
       ? 8 * t * t * t * t
@@ -313,6 +358,23 @@ export function createViewer() {
         // Next frame: controls.update() starts from this position with zero deltas
       }
     } else {
+      // Snapshot tilt state on the first frame after goDissectedView() settles
+      if (_tiltActive && _tiltNeedsSnapshot) {
+        _snapshotTilt();
+        _tiltNeedsSnapshot = false;
+      }
+      // Smoothly lerp camera elevation toward the scroll target
+      if (_tiltActive && Math.abs(_tiltCurrentTheta - _tiltTargetTheta) > 0.0001) {
+        _tiltCurrentTheta = THREE.MathUtils.lerp(_tiltCurrentTheta, _tiltTargetTheta, TILT_LERP);
+        const sinT = Math.sin(_tiltCurrentTheta);
+        const cosT = Math.cos(_tiltCurrentTheta);
+        camera.position.set(
+          controls.target.x + _tiltR * sinT * Math.sin(_tiltPhi),
+          controls.target.y + _tiltR * cosT,
+          controls.target.z + _tiltR * sinT * Math.cos(_tiltPhi)
+        );
+        camera.lookAt(controls.target);
+      }
       controls.update();
     }
 
@@ -334,6 +396,30 @@ export function createViewer() {
       startPos: camera.position.clone(), endPos,
       startQuat: camera.quaternion.clone(), endQuat,
       target: homeTarget,
+      t0: performance.now(), duration: 900, done: false
+    };
+    controls.enabled = false;
+  }
+
+  /**
+   * Like goHome() but shifts the camera and its target upward in world Y by
+   * yOffset units so the model sits closer to the bottom of the screen.
+   * Tilt, zoom, and azimuth are unchanged.
+   *
+   * Tune yOffset to taste — larger values push the model further down.
+   */
+  function goDissectedView(yOffset = 1200) {
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+    const offset   = new THREE.Vector3(0, yOffset, 0);
+    const endPos   = homeState.pos.clone().add(offset);
+    const endTarget = homeState.target.clone().add(offset);
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, endTarget, new THREE.Vector3(0, 1, 0));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: camera.position.clone(), endPos,
+      startQuat: camera.quaternion.clone(), endQuat,
+      target: endTarget,
       t0: performance.now(), duration: 900, done: false
     };
     controls.enabled = false;
@@ -382,5 +468,5 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  return { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goFatbergView, goTopDown };
+  return { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt };
 }

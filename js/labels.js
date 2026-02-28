@@ -64,9 +64,16 @@ export function addImage(scene, id, src, x, y, z, opts = {}) {
   wrapper.className = 'scene-image' + (opts.className ? ` ${opts.className}` : '');
 
   const img = document.createElement('img');
-  img.src = src;
   img.alt = id;
   img.draggable = false;
+  // Both JPG and PNG (and any browser-supported format) are accepted — just pass the
+  // correct file extension in the src argument.
+  // Start blurred; the class is removed once the image has fully decoded so the
+  // transition in .scene-image img plays and the image sharpens smoothly.
+  img.classList.add('img-loading');
+  img.onload  = () => img.classList.remove('img-loading');
+  img.onerror = () => img.classList.remove('img-loading'); // don't stay blurred on failure
+  img.src = src;  // set src AFTER handlers so cached-image onload fires reliably
   wrapper.appendChild(img);
 
   // Open the detail overlay on click/tap — show a frosted overlay with the image
