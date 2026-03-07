@@ -1,30 +1,15 @@
-/**
- * gltfLoader.js – Loads a .glb/.gltf model and applies an origin offset
- * so the large metre-scale coordinates sit near (0, 0, 0).
- *
- * Rhino's glTF exporter already handles Z-up → Y-up and feet → metres,
- * so we do NOT apply any rotation here.
- */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import CONFIG from '../config/config.js';
 
-/**
- * Load the GLB model into the scene.
- * @param {THREE.Scene} scene
- * @param {function} [onProgress] – called with percentage (0-100)
- * @returns {Promise<THREE.Group>} the loaded model group
- */
 export async function loadModel(scene, onProgress) {
   const loader = new GLTFLoader();
 
-  // Optional Draco decoder for compressed meshes (CDN fallback)
   const draco = new DRACOLoader();
   draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
   loader.setDRACOLoader(draco);
 
-  // Helper: load a texture with all UV transforms pre-applied
   function loadTex(path) {
     return new Promise((res, rej) => {
       new THREE.TextureLoader().load(path, (tex) => {
@@ -41,7 +26,6 @@ export async function loadModel(scene, onProgress) {
     });
   }
 
-  // Pre-load both textures in parallel so mode switching is instant
   const [lightTex, darkTex] = await Promise.all([
     loadTex('./assets/textures/gltf_embedded_0.png'),
     loadTex('./assets/textures/gltf_embedded_0.jpeg'),
@@ -83,22 +67,19 @@ export async function loadModel(scene, onProgress) {
       CONFIG.modelPath,
       (gltf) => {
         const model = gltf.scene;
-        const topoTopMats = [];  // top-face materials (textured)
-        const topoSideMats = [];  // side/bottom materials
-        const buildingMats = [];  // building materials
+        const topoTopMats = [];
+        const topoSideMats = [];
+        const buildingMats = [];
 
-        // Optionally rotate if exporter did NOT handle Z-up → Y-up
         if (CONFIG.rotateZUp) {
           model.rotation.x = -Math.PI / 2;
         }
 
-        // Find the "topography" subtree — only apply texture there, skip "buildings"
         let topoNode = null;
         model.traverse((child) => {
           if (child.name === 'topography') topoNode = child;
         });
 
-        // Helper: check if a mesh is inside the topography subtree
         function isTopoMesh(mesh) {
           let node = mesh;
           while (node) {
@@ -108,7 +89,6 @@ export async function loadModel(scene, onProgress) {
           return false;
         }
 
-        // Replace textures only on TOP-FACING faces of topography meshes
         model.traverse((child) => {
           if (child.isMesh && child.material && isTopoMesh(child)) {
             const geom = child.geometry;
@@ -117,14 +97,12 @@ export async function loadModel(scene, onProgress) {
             const normalAttr = geom.attributes.normal;
 
             if (!index || !normalAttr) {
-              // Fallback: apply crossfade material to entire mesh if no index/normals
               const mat = makeCrossfadeMat();
               child.material = mat;
               topoTopMats.push(mat);
               return;
             }
 
-            // Sort triangles into top-facing vs side/bottom based on averaged face normal
             const topIndices = [];
             const sideIndices = [];
             const triCount = index.count / 3;
@@ -135,40 +113,35 @@ export async function loadModel(scene, onProgress) {
               const i1 = index.getX(t * 3 + 1);
               const i2 = index.getX(t * 3 + 2);
 
-              // Average vertex normals for this face
               vA.set(normalAttr.getX(i0), normalAttr.getY(i0), normalAttr.getZ(i0));
               vB.set(normalAttr.getX(i1), normalAttr.getY(i1), normalAttr.getZ(i1));
               vC.set(normalAttr.getX(i2), normalAttr.getY(i2), normalAttr.getZ(i2));
               const avgY = (vA.y + vB.y + vC.y) / 3;
 
-              if (avgY > 0.3) {              // face points mostly upward
+              if (avgY > 0.3) {
                 topIndices.push(i0, i1, i2);
               } else {
                 sideIndices.push(i0, i1, i2);
               }
             }
 
-            // Rebuild index buffer: top faces first, then side faces
             const newIndexArray = new Uint32Array(topIndices.length + sideIndices.length);
             newIndexArray.set(topIndices, 0);
             newIndexArray.set(sideIndices, topIndices.length);
             geom.setIndex(new THREE.BufferAttribute(newIndexArray, 1));
 
-            // Clear old groups and add two material groups
             geom.clearGroups();
-            geom.addGroup(0, topIndices.length, 0);                      // group 0 = textured top
-            geom.addGroup(topIndices.length, sideIndices.length, 1);     // group 1 = plain sides
+            geom.addGroup(0, topIndices.length, 0);
+            geom.addGroup(topIndices.length, sideIndices.length, 1);
 
-            // Crossfade shader material for top faces
             const topMat = makeCrossfadeMat();
 
-            // Plain material for side/bottom faces
             const sideMat = new THREE.MeshStandardMaterial({
               color: new THREE.Color(0x111111),
               metalness: 0,
               roughness: 1,
               side: THREE.DoubleSide,
-              emissive: new THREE.Color(0x111111),  // slight self-illumination so it's visibly grey
+              emissive: new THREE.Color(0x111111),
             });
 
             child.material = [topMat, sideMat];
@@ -177,7 +150,6 @@ export async function loadModel(scene, onProgress) {
             console.log(`[gltfLoader] Topo split: ${topIndices.length / 3} top faces, ${sideIndices.length / 3} side faces`);
           }
 
-          // Fix buildings: render both sides so no faces appear missing
           if (child.isMesh && child.material && !isTopoMesh(child)) {
             const materials = Array.isArray(child.material)
               ? child.material
@@ -190,7 +162,7 @@ export async function loadModel(scene, onProgress) {
             }
           }
         });
-        // ---- Hard-coded UV projection: top-down (XZ), rotate 180°, mirror X ----
+
         const topoMeshes = [];
         model.traverse((child) => {
           if (child.isMesh && isTopoMesh(child)) topoMeshes.push(child);
@@ -213,7 +185,6 @@ export async function loadModel(scene, onProgress) {
         }
         console.log('[gltfLoader] UV projection: top(XZ), rot 180°, mirror X applied.');
 
-        // Wrap in a group and shift by -offset so model centres near origin
         const wrapper = new THREE.Group();
         wrapper.add(model);
         wrapper.position.set(
@@ -224,28 +195,21 @@ export async function loadModel(scene, onProgress) {
 
         scene.add(wrapper);
 
-        // Fixed endpoints for lerping
         const B_LIGHT = new THREE.Color(0x555555);
         const B_DARK = new THREE.Color(0xcccccc);
         const S_LIGHT = new THREE.Color(0x444444);
         const S_DARK = new THREE.Color(0xeeeeee);
 
-        // t = 0 → full light mode, t = 1 → full dark mode
         const setModeProgress = (t) => {
-          // Crossfade terrain texture via onBeforeCompile uniform — no snap
           for (const mat of topoTopMats) {
             mat.userData.crossfadeUniforms.mixT.value = t;
           }
-          // Lerp building colors
           for (const mat of buildingMats) {
             mat.color.lerpColors(B_LIGHT, B_DARK, t);
-            // mat.emissive.lerpColors(S_LIGHT, S_DARK, t);
             mat.needsUpdate = true;
           }
-          // Lerp topo side colors
           for (const mat of topoSideMats) {
             mat.color.lerpColors(S_LIGHT, S_DARK, t);
-            // mat.emissive.lerpColors(S_LIGHT, S_DARK, t);
             mat.needsUpdate = true;
           }
         };
@@ -255,7 +219,7 @@ export async function loadModel(scene, onProgress) {
       },
       (progress) => {
         if (progress.total && onProgress) {
-          onProgress((progress.loaded / progress.total) * 100);
+          onProgress(Math.min((progress.loaded / progress.total) * 100, 100));
         }
       },
       (err) => {

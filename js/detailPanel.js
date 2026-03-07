@@ -1,13 +1,3 @@
-/**
- * detailPanel.js – Multi-panel detail card system.
- *
- * One independent panel per dataset type (CSO / NPDES / RCRA) or per image.
- * Panels are created on first open and reused (shown/hidden) thereafter.
- * Clicking a point from a different dataset opens a second panel alongside
- * the existing one, stacked slightly offset so both are visible.
- */
-
-/* ---------- Per-dataset content ---------- */
 const DATASET_CONTENT = {
   CSO: {
     title: 'Combined Sewer Overflow (CSO)',
@@ -44,15 +34,12 @@ function fallbackContent(type) {
   return { title: type, body: `Details for the ${type} dataset will appear here.` };
 }
 
-/* ---------- Type helpers ---------- */
-
-/** Normalise any RCRA / CSO / NPDES variant to a canonical key used for panel lookup. */
 function normalizeKey(type) {
   const t = String(type).toLowerCase();
   if (t.includes('rcra'))  return 'RCRA';
   if (t.includes('cso'))   return 'CSO';
   if (t.includes('npdes')) return 'NPDES';
-  return type; // image labels or unknowns keep their title as key
+  return type;
 }
 
 function typeColor(type) {
@@ -63,37 +50,30 @@ function typeColor(type) {
   return 'var(--accent)';
 }
 
-/* ---------- SVG icon strings ---------- */
 const SVG_PREV  = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L6 8l4 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const SVG_NEXT  = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l4 5-4 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const SVG_CLOSE = `<svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
 
-/* ---------- Global panel registry ---------- */
-const panelMap   = new Map();  // normalizedKey → PanelInstance
+const panelMap   = new Map();
 let openCount    = 0;
 let lastClosedAt = 0;
 let lastActiveKey = null;
-let openOrderCounter = 0;  // resets to 0 whenever all panels close
+let openOrderCounter = 0;
 
-const STACK_OFFSET = 28;  // px of additional top offset per stacked panel
+const STACK_OFFSET = 28;
 
-/* ============================================================
-   PanelInstance – one panel card per dataset type / image
-   ============================================================ */
 class PanelInstance {
   constructor(key) {
     this.key           = key;
-    this.displayOrder  = -1;  // assigned fresh on each open(), cleared on close()
+    this.displayOrder  = -1;
     this.isOpen        = false;
     this.dragTransform = '';
     this.currentGroup  = [];
     this.currentIndex  = 0;
 
-    /* ---- Build DOM ---- */
     this.el = document.createElement('div');
     this.el.className = 'detail-panel hidden';
     this.el.setAttribute('aria-hidden', 'true');
-    // Position is set dynamically in open() based on current session order
     this.el.style.top    = '12px';
     this.el.style.zIndex = '100';
     this.el.innerHTML = `
@@ -114,7 +94,6 @@ class PanelInstance {
       </div>`;
     document.body.appendChild(this.el);
 
-    /* ---- Cache child refs ---- */
     this.dragHeader = this.el.querySelector('.dp-draggable');
     this.counterEl  = this.el.querySelector('.dp-counter');
     this.prevBtn    = this.el.querySelector('.dp-prev');
@@ -130,7 +109,6 @@ class PanelInstance {
     this._wireEvents();
   }
 
-  /* ---- Event wiring ---- */
   _wireEvents() {
     this.closeBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -187,7 +165,7 @@ class PanelInstance {
       dragging = false;
       this.dragHeader.style.cursor = 'grab';
       document.body.style.userSelect = '';
-      this.el.style.transition = '';  // restore CSS transitions after drag
+      this.el.style.transition = '';
     });
   }
 
@@ -200,13 +178,11 @@ class PanelInstance {
     this.el.style.zIndex = String(maxZ + 1);
   }
 
-  /* ---- Open / close ---- */
   open(group, index) {
     this.currentGroup = group;
     this.currentIndex = index;
 
     if (this.isOpen) {
-      // Already visible – swap content and bring to front
       this.renderPoint(true);
       this._bringToFront();
       return;
@@ -214,15 +190,12 @@ class PanelInstance {
 
     this.renderPoint(false);
 
-    // Assign stacking order for this session and update top position
     this.displayOrder = openOrderCounter++;
     this.el.style.top = `${12 + this.displayOrder * STACK_OFFSET}px`;
 
-    // Apply saved drag position (empty string = CSS handles slide-in from right)
     this.el.style.transform = this.dragTransform || '';
     this.el.classList.remove('hidden');
     this.el.setAttribute('aria-hidden', 'false');
-    // Double rAF so the browser paints one opacity:0 frame before adding .visible
     requestAnimationFrame(() => requestAnimationFrame(() => {
       this.el.classList.add('visible');
     }));
@@ -243,24 +216,19 @@ class PanelInstance {
 
     this.el.classList.remove('visible');
     this.el.setAttribute('aria-hidden', 'true');
-    // Reset position so next open always slides in fresh from the right
     this.el.style.transform = '';
     this.dragTransform = '';
     this.isOpen = false;
-    this.displayOrder = -1;  // release this panel's slot
+    this.displayOrder = -1;
     openCount = Math.max(0, openCount - 1);
     lastClosedAt = performance.now();
 
-    // Fire detail-close with remaining panel count so viewer.js only
-    // unshifts the camera frustum when the very last panel is gone.
     window.dispatchEvent(new CustomEvent('detail-close', { detail: { panelCount: openCount } }));
 
     if (openCount === 0) {
-      openOrderCounter = 0;  // reset stacking counter so next open starts fresh
+      openOrderCounter = 0;
       document.body.classList.remove('panel-open');
     } else {
-      // Re-apply sprite selection for whichever panel is still open,
-      // since detail-close causes utils.js to clear all selections.
       panelMap.forEach(p => {
         if (p !== this && p.isOpen) {
           const s = p.currentGroup[p.currentIndex];
@@ -274,7 +242,6 @@ class PanelInstance {
     setTimeout(() => { if (!this.isOpen) this.el.classList.add('hidden'); }, 580);
   }
 
-  /* ---- Content rendering ---- */
   fillContent(content, userData, type) {
     if (this.titleEl) this.titleEl.textContent = content.title || '';
     if (this.bodyEl)  this.bodyEl.textContent  = content.body  || '';
@@ -322,7 +289,6 @@ class PanelInstance {
     if (this.prevBtn) this.prevBtn.disabled = this.currentGroup.length <= 1;
     if (this.nextBtn) this.nextBtn.disabled = this.currentGroup.length <= 1;
 
-    // Notify utils.js so the correct 3D sprite gets highlighted
     const s = this.currentGroup[this.currentIndex];
     if (s?.isSprite || s?.isMesh) {
       window.dispatchEvent(new CustomEvent('detail-navigate', { detail: { sprite: s } }));
@@ -353,16 +319,11 @@ class PanelInstance {
   }
 }
 
-/* ---------- Panel registry helpers ---------- */
-
 function getOrCreate(key) {
   if (!panelMap.has(key)) panelMap.set(key, new PanelInstance(key));
   return panelMap.get(key);
 }
 
-/* ---------- Document-level listeners ---------- */
-
-// Keyboard: arrows navigate, Escape closes all open panels
 window.addEventListener('keydown', (e) => {
   if (openCount === 0) return;
 
@@ -386,8 +347,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-/* ---------- Exported API (same surface as before) ---------- */
-
 export function openDetail(payload) {
   let type, group, index;
 
@@ -396,7 +355,6 @@ export function openDetail(payload) {
     group = [{ userData: { type } }];
     index = 0;
   } else if (payload.title || payload.image) {
-    // Direct content from scene-image labels (labels.js)
     type  = payload.title || 'Image';
     group = [{ userData: { type, _direct: { title: payload.title, body: payload.body, image: payload.image } } }];
     index = 0;
@@ -416,12 +374,10 @@ export function openDetail(payload) {
 }
 
 export function closeDetail() {
-  // Close the last-active panel (called imperatively from utils.js / main.js)
   if (lastActiveKey) {
     const p = panelMap.get(lastActiveKey);
     if (p?.isOpen) { p.close(); return; }
   }
-  // Fallback: close first open panel found
   for (const p of panelMap.values()) {
     if (p.isOpen) { p.close(); return; }
   }
@@ -440,10 +396,8 @@ export function justClosed(ms = 300) {
   return (performance.now() - lastClosedAt) < ms;
 }
 
-// Expose globally so utils.js can call it imperatively
 window.closeDetail = closeDetail;
 
-/* ---------- Browser back / forward ---------- */
 window.addEventListener('popstate', (e) => {
   if (openCount > 0 && !e.state?.detailPanel) {
     panelMap.forEach(p => { if (p.isOpen) p.close(); });

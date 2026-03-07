@@ -1,17 +1,6 @@
-/**
- * csvLoader.js – Fetches a CSV file, parses it, and creates sprite-based
- * point markers that maintain a constant screen size regardless of zoom.
- *
- * Expects CSV columns: X, Y  (EPSG:2263 US survey feet)
- * Optional columns used for tooltips: EntityHandle, Text, Layer
- */
 import * as THREE from 'three';
 import CONFIG from '../config/config.js';
 
-/**
- * Parse a simple CSV string into an array of objects.
- * Handles quoted fields.
- */
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
@@ -30,12 +19,6 @@ function parseCSV(text) {
   return rows;
 }
 
-/**
- * Create a circular dot texture via a canvas.
- * @param {number} color  hex color (e.g. 0xff0000)
- * @param {number} [size=64]  canvas pixel size
- * @returns {THREE.CanvasTexture}
- */
 function createDotTextureSelected(color, size = 64) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -45,19 +28,17 @@ function createDotTextureSelected(color, size = 64) {
   const hex = '#' + new THREE.Color(color).getHexString();
   const half = size / 2;
   const radius = half * 0.72;
-  const ringW = radius * 0.30;  // ring thickness = 30% of radius
+  const ringW = radius * 0.30;
 
-  // Step 1: fill canvas with ring color, punch outer circle shape as alpha mask
   ctx.fillStyle = hex;
   ctx.fillRect(0, 0, size, size);
   ctx.globalCompositeOperation = 'destination-in';
   ctx.beginPath();
   ctx.arc(half, half, radius, 0, Math.PI * 2);
-  ctx.fillStyle = 'black'; // only alpha matters
+  ctx.fillStyle = 'black';
   ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
 
-  // Step 2: white fill for the inner circle (creates the ring effect)
   ctx.beginPath();
   ctx.arc(half, half, radius - ringW, 0, Math.PI * 2);
   ctx.fillStyle = 'white';
@@ -79,29 +60,22 @@ function createDotTexture(color, size = 64) {
   const half = size / 2;
   const radius = half * 0.72;
 
-  // Fill entire canvas with the dot color first, then punch the circle
-  // shape as an alpha mask using destination-in. This ensures anti-aliased
-  // edge pixels fade from full color → transparent (same hue) rather than
-  // blending into transparent-black, which would create a dark fringe ring.
+  // Fill canvas then punch circle as alpha mask — prevents dark fringe on anti-aliased edges.
   ctx.fillStyle = hex;
   ctx.fillRect(0, 0, size, size);
   ctx.globalCompositeOperation = 'destination-in';
   ctx.beginPath();
   ctx.arc(half, half, radius, 0, Math.PI * 2);
-  ctx.fillStyle = 'black'; // color irrelevant with destination-in; only alpha matters
+  ctx.fillStyle = 'black';
   ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;  // ensure colors display at full vibrancy
+  texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
   return texture;
 }
 
-/**
- * Convert an EPSG:2263 (X, Y) pair (US survey feet) into the Three.js
- * scene coordinate system (metres, Y-up, origin-offset applied).
- */
 function toSceneCoords(xEpsg, yEpsg) {
   const ft2m = CONFIG.feetToMeters;
   const off  = CONFIG.originOffset;
@@ -113,10 +87,6 @@ function toSceneCoords(xEpsg, yEpsg) {
   );
 }
 
-/**
- * Load a CSV file and add sprite markers to the scene.
- * Sprites use sizeAttenuation=true with dynamic scale adjustment for constant screen size.
- */
 export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
   const response = await fetch(csvPath);
   const text = await response.text();
@@ -128,18 +98,18 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
 
   const material = new THREE.SpriteMaterial({
     map: lightTex,
-    sizeAttenuation: true,    // world-unit sizing; we dynamically adjust scale for constant screen size
+    sizeAttenuation: true,
     transparent: true,
     depthWrite: false,
-    depthTest: false,         // always render on top of geometry
+    depthTest: false,
     blending: THREE.NormalBlending,
-    toneMapped: false,        // bypass ACES tone mapping so colors match the hex exactly
+    toneMapped: false,
   });
   material.userData.selectedTex = selectedTex;
 
   const group = new THREE.Group();
   group.name = label;
-  group.renderOrder = 999;    // ensure dots draw after all other objects
+  group.renderOrder = 999;
 
   const markerSize = CONFIG.marker.worldSize;
 
@@ -149,13 +119,10 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
     if (Number.isNaN(x) || Number.isNaN(y)) return;
 
     const pos = toSceneCoords(x, y);
-    // Share material across sprites — no clone needed; all dots in a group look identical
     const sprite = new THREE.Sprite(material);
     sprite.position.copy(pos);
-
     sprite.scale.set(markerSize, markerSize, 1);
 
-    // Attach metadata for raycasting / tooltips
     sprite.userData = {
       type: label,
       handle: row.EntityHandle || '',
@@ -167,8 +134,6 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
     group.add(sprite);
   });
 
-  // Find the leftmost and rightmost sprites by scene X — used by DISSECTED annotations
-  // to pick the shortest-path edge point based on which side the text panel is on.
   let edgeSpriteLeft = null, edgeSpriteRight = null;
   let minX = Infinity, maxX = -Infinity;
   for (const child of group.children) {
@@ -181,9 +146,6 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
   return { group, rows, material, lightTex, darkTex, edgeSpriteLeft, edgeSpriteRight };
 }
 
-/**
- * Convenience: load all CSV datasets defined in CONFIG.
- */
 export async function loadAllCSV(scene) {
   const results = {};
   for (const [key, cfg] of Object.entries(CONFIG.csvFiles)) {

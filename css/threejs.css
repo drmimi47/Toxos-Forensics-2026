@@ -1,16 +1,13 @@
-/* ===== Three.js Canvas Styles ===== */
-#viewer-container {
+.viewer-container {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;        /* use right instead of width:100% so we can animate it */
+  right: 0;
   height: 100%;
-  /* No z-index: keeps viewer in the body stacking context so that
-     mix-blend-mode on legend text can blend directly against canvas pixels.
-     DOM order (legend comes after viewer-container) keeps UI on top. */
+  /* no z-index — keeps viewer in body stacking context so mix-blend-mode blends against canvas */
 }
 
-#viewer-container canvas {
+.viewer-container canvas {
   display: block;
   width: 100%;
   height: 100%;

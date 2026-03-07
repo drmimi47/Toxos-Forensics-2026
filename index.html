@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/color.css" />
   <link rel="stylesheet" href="./css/style.css" />
   <link rel="stylesheet" href="./css/threejs.css" />
 </head>
@@ -31,13 +32,13 @@
   </div>
 
   <!-- Three.js canvas container -->
-  <div id="viewer-container"></div>
+  <div id="viewer-container" class="viewer-container"></div>
 
   <!-- Header -->
-  <header id="header">
+  <header id="header" class="site-header">
       <span class="brand-mark">TOXOS<span class="brand-sub">lab</span></span>
       <div class="subnav-wrap">
-        <nav id="subnav">
+        <nav id="subnav" class="subnav">
           <a class="subnav-item" href="#">About</a>
           <a class="subnav-item" href="#">Collage</a>
           <a class="subnav-item" href="#">Fatberg</a>
@@ -46,13 +47,12 @@
           <a class="subnav-item" href="#">Dissected</a>
           <a class="subnav-item" href="#">Credits</a>
         </nav>
-        <span id="subnav-dot"></span>
+        <span id="subnav-dot" class="subnav-dot"></span>
       </div>
-      <button id="dark-mode-btn" class="dark-mode-btn" aria-label="Toggle dark mode">◑</button>
   </header>
 
   <!-- Legend overlay -->
-  <div id="legend">
+  <div id="legend" class="legend">
     <div class="legend-item">
       <span class="legend-dot cso"></span>
       <span class="legend-label">Combined Sewer Overflow (CSO) &nbsp;</span>
@@ -71,12 +71,12 @@
   </div>
 
   <!-- Tooltip for hover info -->
-  <div id="tooltip" class="hidden"></div>
+  <div id="tooltip" class="tooltip hidden"></div>
 
   <!-- Detail panels are created dynamically by detailPanel.js -->
 
   <!-- About overlay -->
-  <div id="about-overlay">
+  <div id="about-overlay" class="overlay--about">
     <div class="credits-content">
       <p class="credits-role">ABOUT</p>
       <p class="about-body">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
@@ -110,7 +110,7 @@
   </div>
 
   <!-- Credits overlay -->
-  <div id="credits-overlay">
+  <div id="credits-overlay" class="overlay--credits">
     <div class="credits-content">
       <p class="credits-role">FOUNDERS</p>
       <p class="credits-name">— Claire Galla</p>
@@ -130,7 +130,7 @@
   </div>
 
   <!-- Footer -->
-  <footer id="footer">
+  <footer id="footer" class="site-footer">
     <div class="footer-controls">
       <p class="controls-mouse">
         <span class="ctrl-lmb"><span class="key">LMB</span> Rotate</span>&ensp;

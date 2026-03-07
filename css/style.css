@@ -1,115 +1,8 @@
-.dp-draggable {
-  cursor: grab;
-  user-select: none;
-}
-.dp-draggable.dragging {
-  cursor: grabbing;
-}
-
-.detail-panel.dragging {
-  transition: none !important;
-  opacity: 0.98;
-  filter: none;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 1.5px 8px rgba(0,0,0,0.10);
-  z-index: 9999;
-}
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap");
-
-/* ===== Animatable CSS Custom Properties ===== */
-@property --bg-dark {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #d6d2ca;
-}
-@property --bg-panel {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: rgba(255, 255, 255, 0.45);
-}
-@property --border {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: rgba(4, 22, 118, 0.1);
-}
-@property --border-bright {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: rgba(4, 22, 118, 0.18);
-}
-@property --text {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #1a1a2a;
-}
-@property --text-dim {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #6b6b7a;
-}
-
-/* ===== Design Tokens ===== */
 :root {
-  --accent: #a7ce08;
-  --accent-dim: #4d5c04;
-  --accent-glow: rgba(102, 123, 5, 0.25);
-  --bg-dark: #eeeeee;
-  --bg-panel: rgba(255, 255, 255, 0.8);
-  --bg-panel-solid: #ffffff;
-  --border: rgba(4, 22, 118, 0.1);
-  --border-bright: rgba(4, 22, 118, 0.18);
-  --text: #1a1a1a;
-  --text-dim: #6b6b6a;
-  --scene-image-brightness: 1; /* set <1 to darken, >1 to brighten */
-  --cso-color: #00ffff;
-  --npdes-color: #ff3800;
-  --rcra-color: #515b28;
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", "Consolas", monospace;
-  --label: #ffffff;
 }
 
-/* ===== Dark Mode Tokens ===== */
-body.dark {
-  --bg-dark: #0c0c0c;
-  --bg-panel: rgba(30, 30, 30, 0.8);
-  --bg-panel-solid: #111111;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-bright: rgba(255, 255, 255, 0.15);
-  --text: #e8e8e8;
-  --text-dim: #888888;
-  --label: #000000;
-  --scene-image-brightness: 0.5;
-}
-
-body.dark {
-  --cso-color: #FF0000;
-  --npdes-color: #00FF00;
-  --rcra-color: #b1c074;
-}
-
-body.dark .footer-controls .key {
-  background: rgba(255, 255, 255, 0.1);
-  transition: background 0.5s ease;
-}
-
-/* ===== Dark Mode Button ===== */
-.dark-mode-btn {
-  background: none;
-  border: none;
-  font-size: 1.3rem;
-  line-height: 1;
-  padding: 4px 6px;
-  cursor: pointer;
-  pointer-events: all;
-  color: #ffffff;
-  opacity: 1;
-  transition: opacity 0.2s;
-}
-.dark-mode-btn:hover {
-  opacity: 0.6;
-}
-
-/* ===== Global Reset & Base ===== */
 *,
 *::before,
 *::after {
@@ -143,19 +36,10 @@ body {
   color: var(--bg-panel-solid);
 }
 
-/* ===== Scrollbar ===== */
-::-webkit-scrollbar {
-  width: 5px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg-dark);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--accent-dim);
-  border-radius: 3px;
-}
+::-webkit-scrollbar        { width: 5px; }
+::-webkit-scrollbar-track  { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb  { background: var(--accent-dim); border-radius: 3px; }
 
-/* ===== Preloader ===== */
 .preloader {
   position: fixed;
   inset: 0;
@@ -168,13 +52,11 @@ body {
     opacity 0.6s ease,
     visibility 0.6s ease;
 }
-
 .preloader.done {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
-
 .preloader-wrapper {
   display: flex;
   align-items: center;
@@ -182,12 +64,10 @@ body {
   width: 100%;
   height: 100%;
 }
-
 .preloader-content {
   text-align: center;
   width: 180px;
 }
-
 .preloader-brand {
   font-family: var(--font-mono);
   font-size: 2rem;
@@ -197,7 +77,6 @@ body {
   margin-bottom: 1rem;
   transform: translateX(4.5px);
 }
-
 .preloader-bar-track {
   width: 100%;
   height: 3px;
@@ -206,7 +85,6 @@ body {
   overflow: hidden;
   margin-bottom: 8px;
 }
-
 .preloader-bar-fill {
   width: 0%;
   height: 100%;
@@ -214,7 +92,6 @@ body {
   border-radius: 1px;
   transition: width 0.3s ease-out;
 }
-
 .preloader-text {
   font-family: var(--font-mono);
   font-size: 0.72rem;
@@ -223,8 +100,23 @@ body {
   letter-spacing: 0.08em;
 }
 
-/* ===== Header ===== */
-#header {
+.dark-mode-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  pointer-events: all;
+  color: #ffffff;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+.dark-mode-btn:hover {
+  opacity: 0.6;
+}
+
+.site-header {
   position: absolute;
   top: 0;
   left: 0;
@@ -238,15 +130,11 @@ body {
   pointer-events: none;
   mix-blend-mode: difference;
 }
-
 .header-brand {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
-/* top left title TOXOS */
-
 .brand-mark {
   font-family: var(--font-mono);
   font-weight: 500;
@@ -254,25 +142,23 @@ body {
   letter-spacing: 0.3em;
   color: #ffffff;
 }
-
 .brand-sub {
+  /* explicit white required — mix-blend-mode: difference inverts against both light and dark backgrounds */
   font-size: 0.75rem;
   font-weight: 400;
   letter-spacing: 0.15em;
-  color: #ffffff; /* must be explicit (not inherited) so mix-blend-mode: difference works in both modes */
+  color: #ffffff;
   margin-left: 0.4em;
   vertical-align: top;
   position: relative;
-  top: 9px; /* ← nudge down (positive = lower, negative = higher) */
+  top: 9px;
 }
-
 .brand-divider {
   width: 1px;
   height: 16px;
   background: var(--border-bright);
 }
 
-/* ===== Header Subnav ===== */
 .subnav-wrap {
   position: absolute;
   left: 50%;
@@ -282,8 +168,7 @@ body {
   align-items: center;
   pointer-events: all;
 }
-
-/* Beveled border frame: white fill clipped to octagon = 1px visible border via difference blend */
+/* white fill + clip-path octagon = 1px beveled border via difference blend */
 .subnav-wrap::before {
   content: '';
   position: absolute;
@@ -296,9 +181,8 @@ body {
     0% calc(100% - 6px), 0% 6px
   );
 }
-
-/* Inner nav: black bg = no-op in difference blend ("transparent"); 1px margin reveals white frame */
-#subnav {
+/* black bg = no-op in difference blend; 1px negative margin reveals white frame behind */
+.subnav {
   position: relative;
   display: flex;
   align-items: center;
@@ -313,7 +197,6 @@ body {
     0% calc(100% - 5px), 0% 5px
   );
 }
-
 .subnav-item {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -326,12 +209,10 @@ body {
   pointer-events: all;
   transition: opacity 0.15s;
 }
-
 .subnav-item:hover {
   opacity: 0.6;
 }
-
-#subnav-dot {
+.subnav-dot {
   position: absolute;
   top: -2px;
   left: 0;
@@ -344,35 +225,20 @@ body {
   transition: transform 0.42s cubic-bezier(0.34, 1.35, 0.64, 1);
 }
 
-/* ===== Legend ===== */
-#legend {
+.legend {
   position: absolute;
   bottom: 64px;
-  left: 0px;
-  padding: 24px 24px;
+  left: 0;
+  padding: 24px;
   min-width: 190px;
   background: transparent;
 }
-body.collage-mode #legend,
-body.fatberg-mode #legend,
-body.dissected-mode #legend {
+:is(.collage-mode, .fatberg-mode, .dissected-mode) .legend {
   pointer-events: none;
 }
-body.collage-mode #legend .legend-title,
-body.collage-mode #legend .legend-dot,
-body.collage-mode #legend .legend-label,
-body.collage-mode #legend .legend-count,
-body.fatberg-mode #legend .legend-title,
-body.fatberg-mode #legend .legend-dot,
-body.fatberg-mode #legend .legend-label,
-body.fatberg-mode #legend .legend-count,
-body.dissected-mode #legend .legend-title,
-body.dissected-mode #legend .legend-dot,
-body.dissected-mode #legend .legend-label,
-body.dissected-mode #legend .legend-count {
+:is(.collage-mode, .fatberg-mode, .dissected-mode) .legend :is(.legend-title, .legend-dot, .legend-label, .legend-count) {
   opacity: 0;
 }
-
 .legend-title {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -383,14 +249,12 @@ body.dissected-mode #legend .legend-count {
   margin-bottom: 10px;
   mix-blend-mode: difference;
 }
-
 .legend-item {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 4px 0;
 }
-
 .legend-label {
   font-size: 0.8rem;
   flex: 1;
@@ -398,7 +262,6 @@ body.dissected-mode #legend .legend-count {
   mix-blend-mode: difference;
   user-select: none;
 }
-
 .legend-count {
   font-family: var(--font-mono);
   font-size: 0.72rem;
@@ -406,19 +269,16 @@ body.dissected-mode #legend .legend-count {
   mix-blend-mode: difference;
   user-select: none;
 }
-
-.legend-item.disabled .legend-dot,
-.legend-item.disabled .legend-label,
-.legend-item.disabled .legend-count {
-  opacity: 0.35;
-}
-
 .legend-dot,
 .legend-label,
 .legend-count {
   transition: opacity 0.2s ease;
 }
-
+.legend-item.disabled .legend-dot,
+.legend-item.disabled .legend-label,
+.legend-item.disabled .legend-count {
+  opacity: 0.35;
+}
 .legend-dot {
   width: 8px;
   height: 8px;
@@ -427,20 +287,7 @@ body.dissected-mode #legend .legend-count {
   flex-shrink: 0;
 }
 
-.legend-dot.cso {
-  background: var(--cso-color);
-}
-
-.legend-dot.npdes {
-  background: var(--npdes-color);
-}
-
-.legend-dot.rcra {
-  background: var(--rcra-color);
-}
-
-/* ===== Tooltip ===== */
-#tooltip {
+.tooltip {
   position: absolute;
   z-index: 20;
   background: var(--bg-panel);
@@ -456,13 +303,11 @@ body.dissected-mode #legend .legend-count {
   max-width: 280px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
 }
-
-#tooltip strong {
+.tooltip strong {
   color: var(--text);
   font-weight: 600;
 }
-
-#tooltip .tip-img {
+.tooltip .tip-img {
   display: block;
   width: 100%;
   max-width: 180px;
@@ -471,22 +316,18 @@ body.dissected-mode #legend .legend-count {
   border-radius: 4px;
   opacity: 0.75;
 }
-
-#tooltip .tip-label {
+.tooltip .tip-label {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--text-dim);
 }
-
-#tooltip .tip-value {
+.tooltip .tip-value {
   color: var(--text);
 }
-
-#tooltip.hidden {
+.tooltip.hidden {
   opacity: 0;
 }
 
-/* ===== Detail Panel – right-side card ===== */
 .detail-panel {
   position: fixed;
   top: 12px;
@@ -508,30 +349,37 @@ body.dissected-mode #legend .legend-count {
   flex-direction: column;
   overflow: hidden;
   pointer-events: none;
-
-  /* Closed state */
   opacity: 0;
   transform: translateX(calc(100% + 24px)) scale(0.94);
   filter: blur(12px);
-
   transition:
     opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
     transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
     filter 0.30s cubic-bezier(0.32, 0.72, 0, 1);
 }
-
 .detail-panel.visible {
   opacity: 1;
   transform: translateX(0) scale(1);
   filter: blur(0px);
   pointer-events: all;
 }
-
 .detail-panel.hidden {
   display: none;
 }
-
-/* ---- Panel header (nav + close) ---- */
+.detail-panel.dragging {
+  transition: none;
+  opacity: 0.98;
+  filter: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 1.5px 8px rgba(0,0,0,0.10);
+  z-index: 9999;
+}
+.dp-draggable {
+  cursor: grab;
+  user-select: none;
+}
+.dp-draggable.dragging {
+  cursor: grabbing;
+}
 .dp-header {
   display: flex;
   align-items: center;
@@ -540,13 +388,11 @@ body.dissected-mode #legend .legend-count {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-
 .dp-nav {
   display: flex;
   align-items: center;
   gap: 2px;
 }
-
 .dp-nav-btn,
 .dp-close-btn {
   display: flex;
@@ -557,31 +403,26 @@ body.dissected-mode #legend .legend-count {
   height: 24px;
   color: var(--text-dim);
   background: transparent;
-
   cursor: pointer;
   transition:
     background 0.18s ease,
     opacity 0.18s ease,
     transform 0.12s cubic-bezier(0.32, 0.72, 0, 1);
 }
-
 .dp-nav-btn:hover,
 .dp-close-btn:hover {
   opacity: 0.6;
 }
-
 .dp-nav-btn:active,
 .dp-close-btn:active {
   transform: scale(0.88);
   opacity: 0.6;
 }
-
 .dp-nav-btn:disabled {
   opacity: 0;
   cursor: default;
   pointer-events: none;
 }
-
 .dp-counter {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -591,21 +432,16 @@ body.dissected-mode #legend .legend-count {
   text-align: center;
   user-select: none;
 }
-
-/* ---- Scrollable content area ---- */
 .dp-scroll {
   flex: 1;
   overflow-y: auto;
   padding: 24px 22px 36px;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE / Edge legacy */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-
 .dp-scroll::-webkit-scrollbar {
-  display: none; /* Chrome / Safari / WebKit */
+  display: none;
 }
-
-/* ---- Type badge ---- */
 .dp-type-badge {
   display: inline-flex;
   align-items: center;
@@ -618,7 +454,6 @@ body.dissected-mode #legend .legend-count {
   color: var(--text-dim);
   margin-bottom: 10px;
 }
-
 .dp-type-dot {
   display: inline-block;
   width: 7px;
@@ -626,8 +461,6 @@ body.dissected-mode #legend .legend-count {
   border-radius: 50%;
   flex-shrink: 0;
 }
-
-/* ---- Title ---- */
 .detail-title {
   font-family: var(--font-sans);
   font-weight: 700;
@@ -637,12 +470,9 @@ body.dissected-mode #legend .legend-count {
   color: var(--text);
   margin: 0 0 18px;
 }
-
-/* ---- Meta grid ---- */
 .detail-meta {
   margin-bottom: 20px;
 }
-
 .dp-meta-grid {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -652,11 +482,6 @@ body.dissected-mode #legend .legend-count {
   padding: 13px 15px;
   background: rgba(0, 0, 0, 0.02);
 }
-
-body.dark .dp-meta-grid {
-  background: rgba(255, 255, 255, 0.02);
-}
-
 .dp-meta-label {
   font-family: var(--font-mono);
   font-size: 0.65rem;
@@ -666,7 +491,6 @@ body.dark .dp-meta-grid {
   align-self: center;
   white-space: nowrap;
 }
-
 .dp-meta-value {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -674,12 +498,9 @@ body.dark .dp-meta-grid {
   word-break: break-all;
   align-self: center;
 }
-
-/* ---- Image ---- */
 .dp-image-wrap {
   margin-bottom: 20px;
 }
-
 .detail-panel-image {
   display: block;
   width: 100%;
@@ -688,8 +509,6 @@ body.dark .dp-meta-grid {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
   object-fit: cover;
 }
-
-/* ---- Body text ---- */
 .detail-body {
   font-family: var(--font-sans);
   font-weight: 300;
@@ -699,16 +518,14 @@ body.dark .dp-meta-grid {
   margin: 0;
 }
 
-/* ===== About Overlay ===== */
-#about-overlay {
+.overlay--about,
+.overlay--credits {
   position: fixed;
   inset: 0;
   z-index: 50;
   background: var(--bg-panel);
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  overflow-y: auto;
-
   opacity: 0;
   pointer-events: none;
   filter: blur(8px);
@@ -716,20 +533,29 @@ body.dark .dp-meta-grid {
     opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
     filter 0.38s cubic-bezier(0.32, 0.72, 0, 1);
 }
-
-#about-overlay.visible {
+.overlay--about.visible,
+.overlay--credits.visible {
   opacity: 1;
   pointer-events: all;
   filter: blur(0);
 }
-
-#about-overlay .credits-content {
+.overlay--about {
+  overflow-y: auto;
+}
+.overlay--credits {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.overlay--about .credits-content {
   max-width: 640px;
   width: 90%;
   margin: 0 auto;
   padding: 225px 0 80px;
 }
-
+.credits-content {
+  text-align: left;
+}
 .about-body {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -738,43 +564,6 @@ body.dark .dp-meta-grid {
   margin: 0 0 14px 0;
   line-height: 1.8;
 }
-
-/* ===== Credits Overlay ===== */
-#credits-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: var(--bg-panel);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  /* Hidden state */
-  opacity: 0;
-  pointer-events: none;
-  filter: blur(8px);
-  transition:
-    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
-    filter 0.38s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-#credits-overlay.visible {
-  opacity: 1;
-  pointer-events: all;
-  filter: blur(0);
-}
-
-.credits-content {
-  text-align: left;
-}
-
-/* Add to any element inside credits-content to insert a larger-than-normal gap above it. */
-.section-gap {
-  margin-top: 36px !important;
-}
-
 .credits-role {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -783,12 +572,10 @@ body.dark .dp-meta-grid {
   text-transform: uppercase;
   margin: 0 0 4px 0;
 }
-
-.credits-role + .credits-role,
-.credits-name + .credits-role {
+.credits-role + .credits-role:not(.section-gap),
+.credits-name + .credits-role:not(.section-gap) {
   margin-top: 20px;
 }
-
 .credits-name {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -796,7 +583,6 @@ body.dark .dp-meta-grid {
   letter-spacing: 0.04em;
   margin: 0 0 2px 0;
 }
-
 .credits-note {
   font-family: var(--font-mono);
   font-size: 0.65rem;
@@ -805,13 +591,11 @@ body.dark .dp-meta-grid {
   letter-spacing: 0.04em;
   margin: 18px 0 0 0;
 }
-
 .credits-note + .credits-note {
   margin-top: 2px;
 }
 
-/* ===== Footer ===== */
-#footer {
+.site-footer {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -820,14 +604,13 @@ body.dark .dp-meta-grid {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 24px 24px 24px;
+  padding: 22px 24px 24px;
   background: var(--bg-panel);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   pointer-events: none;
 }
-
 .footer-controls {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -836,7 +619,6 @@ body.dark .dp-meta-grid {
   color: var(--text-dim);
   user-select: none;
 }
-
 .footer-controls .key {
   display: inline-block;
   background: rgba(0, 0, 0, 0.05);
@@ -847,7 +629,6 @@ body.dark .dp-meta-grid {
   color: var(--text-dim);
   margin-right: 2px;
 }
-
 .footer-meta {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -855,54 +636,6 @@ body.dark .dp-meta-grid {
   letter-spacing: 0.04em;
 }
 
-/* Touch vs mouse */
-.controls-mouse {
-  display: block;
-}
-
-/* Pulse animation: briefly flashes a dimmed hint to signal the action is disabled.
-   The animation overrides the transition on the element while it runs, then
-   the element returns to its dimmed opacity (0.38) when the class is removed. */
-@keyframes ctrl-disabled-pulse {
-  0%   { opacity: 0.38; }
-  20%  { opacity: 0.92; }
-  100% { opacity: 0.38; }
-}
-.ctrl-pulse {
-  animation: ctrl-disabled-pulse 0.48s ease-out;
-}
-
-/* LMB rotate hint dims when rotation is disabled in COLLAGE or DISSECTED mode */
-.ctrl-lmb {
-  transition: opacity 0.3s ease;
-}
-body.collage-mode .ctrl-lmb,
-body.dissected-mode .ctrl-lmb {
-  opacity: 0.38;
-}
-
-/* RMB pan, Scroll zoom, and DblClick hints dim in DISSECTED mode */
-.ctrl-rmb,
-.ctrl-scroll,
-.ctrl-dblclick {
-  transition: opacity 0.3s ease;
-}
-body.dissected-mode .ctrl-rmb,
-body.dissected-mode .ctrl-scroll,
-body.dissected-mode .ctrl-dblclick {
-  opacity: 0.38;
-}
-
-/* SCROLL TILT MODEL hint: hidden normally, fades in only in DISSECTED mode */
-.ctrl-scroll-tilt {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-body.dissected-mode .ctrl-scroll-tilt {
-  opacity: 1;
-}
-
-/* ===== CSS2D Scene Labels ===== */
 .scene-label {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 525;
@@ -915,11 +648,9 @@ body.dissected-mode .ctrl-scroll-tilt {
   text-align: center;
   pointer-events: none;
   user-select: none;
-  -webkit-text-stroke: none;
   paint-order: stroke fill;
 }
 
-/* Anchored images (CSS2D) */
 .scene-image {
   pointer-events: none;
   user-select: none;
@@ -938,17 +669,16 @@ body.dissected-mode .ctrl-scroll-tilt {
   border-radius: 3px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   -webkit-user-drag: none;
-  /* slowed animation: originally 0.22s, made ~1.8x slower -> ~0.4s */
   transition:
     transform 0.4s cubic-bezier(0.5, 1.7, 0.5, 1),
-    filter  0.5s ease,
+    filter 0.5s ease,
     opacity 0.32s;
   transform-origin: center center;
 }
 .scene-image img:hover {
   transform: scale(1.18);
 }
-body.panel-open .scene-image img {
+.panel-open .scene-image img {
   pointer-events: none;
   cursor: default;
   transform: none;
@@ -960,16 +690,6 @@ body.panel-open .scene-image img {
   text-align: center;
 }
 
-/* ── Progressive image load blur ─────────────────────────────────────────────
-   Applied by JS before src is set; removed onload / onerror.
-   Works with both .scene-image img (3D scene) and .about-image (ABOUT overlay).
-   The host element must have a `filter` in its transition for a smooth unblur. */
-.img-loading {
-  filter: blur(14px) brightness(0.6) !important;
-  opacity: 0.35 !important;
-}
-
-/* Images inside the ABOUT overlay */
 .about-images {
   display: flex;
   flex-wrap: wrap;
@@ -978,21 +698,18 @@ body.panel-open .scene-image img {
   margin-bottom: 8px;
 }
 .about-image {
-  flex: 1 1 calc(50% - 5px);  /* two-per-row; stacks to one-per-row when narrow */
+  flex: 1 1 calc(50% - 5px);
   min-width: 160px;
   width: 100%;
   height: auto;
   border-radius: 4px;
-  border: 1px solid rgba(128,128,128,0.18);
+  border: 1px solid rgba(128, 128, 128, 0.18);
   display: block;
   object-fit: cover;
   transition: filter 0.5s ease, opacity 0.45s ease;
 }
 
-/* ===== DISSECTED dataset annotations ===== */
-/* Full-viewport SVG overlay — SVG coordinate space matches the fixed viewport so
-   getBoundingClientRect() values are directly usable as SVG x/y attributes. */
-#diss-svg {
+.diss-svg {
   position: fixed;
   top: 0;
   left: 0;
@@ -1004,12 +721,8 @@ body.panel-open .scene-image img {
   transition: opacity 0.32s ease;
   z-index: 4;
 }
-
-/* Left and right panel columns. Panels alternate between columns as datasets are
-   added so each side fills evenly. Both columns span the middle zone of the viewport
-   (clear of header and footer) and space their panels evenly. */
-#diss-panels-right,
-#diss-panels-left {
+.diss-panels--right,
+.diss-panels--left {
   position: fixed;
   top: 0;
   height: 100%;
@@ -1023,27 +736,21 @@ body.panel-open .scene-image img {
   transition: opacity 0.32s ease;
   z-index: 4;
 }
-
-#diss-panels-right { right: 28px; }
-#diss-panels-left  { left:  28px; }
-
+.diss-panels--right { right: 28px; }
+.diss-panels--left  { left:  28px; }
 .diss-panel {
   text-align: left;
-  pointer-events: all; /* re-enable clicks; parent container has pointer-events: none */
+  pointer-events: all;
   cursor: pointer;
-}
-
-/* Dim the panel when its dataset is toggled off (mirrors legend-item.disabled) */
-.diss-panel.disabled .diss-name,
-.diss-panel.disabled .diss-text {
-  opacity: 0.2;
-  transition: opacity 0.2s ease;
 }
 .diss-panel .diss-name,
 .diss-panel .diss-text {
   transition: opacity 0.2s ease;
 }
-
+.diss-panel.disabled .diss-name,
+.diss-panel.disabled .diss-text {
+  opacity: 0.2;
+}
 .diss-name {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 9px;
@@ -1053,7 +760,6 @@ body.panel-open .scene-image img {
   margin: 0 0 5px 0;
   line-height: 1;
 }
-
 .diss-text {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 9px;
@@ -1063,8 +769,7 @@ body.panel-open .scene-image img {
   margin: 0;
 }
 
-/* ===== Snap Cursor ===== */
-#snap-cursor {
+.snap-cursor {
   position: fixed;
   width: 0;
   height: 0;
@@ -1073,48 +778,96 @@ body.panel-open .scene-image img {
   display: none;
   color: var(--label);
 }
-#snap-cursor::before,
-#snap-cursor::after {
+.snap-cursor::before,
+.snap-cursor::after {
   content: '';
   position: absolute;
   background: currentColor;
 }
-#snap-cursor::before {       /* vertical arm */
+.snap-cursor::before {
   width: 1px;
   height: 14px;
   left: -0.5px;
   top: -7px;
 }
-#snap-cursor::after {        /* horizontal arm */
+.snap-cursor::after {
   width: 14px;
   height: 1px;
   left: -7px;
   top: -0.5px;
 }
 
-/* ===== Responsive ===== */
+/* !important intentional — must override component/inline filters applied before image loads */
+.img-loading {
+  filter: blur(14px) brightness(0.6) !important;
+  opacity: 0.35 !important;
+}
+
+/* sibling rules use :not(.section-gap) so this wins without !important */
+.section-gap {
+  margin-top: 36px;
+}
+
+.controls-mouse { display: block; }
+
+@keyframes ctrl-disabled-pulse {
+  0%   { opacity: 0.38; }
+  20%  { opacity: 0.92; }
+  100% { opacity: 0.38; }
+}
+.ctrl-pulse {
+  animation: ctrl-disabled-pulse 0.48s ease-out;
+}
+
+.ctrl-lmb,
+.ctrl-rmb,
+.ctrl-scroll,
+.ctrl-dblclick {
+  transition: opacity 0.3s ease;
+}
+:is(.collage-mode, .dissected-mode) .ctrl-lmb {
+  opacity: 0.38;
+}
+.dissected-mode .ctrl-rmb,
+.dissected-mode .ctrl-scroll,
+.dissected-mode .ctrl-dblclick {
+  opacity: 0.38;
+}
+.ctrl-scroll-tilt {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.dissected-mode .ctrl-scroll-tilt {
+  opacity: 1;
+}
+
 @media screen and (max-width: 640px) {
-  #header {
+  .site-header {
     padding: 6px 16px;
   }
   .subnav-wrap {
     display: none;
   }
-  #legend {
+  .legend {
     bottom: 48px;
     left: 16px;
     right: 20px;
-    padding: 16px 0px;
+    padding: 16px 0;
   }
-  #footer {
-    padding: 16px 16px;
+  .legend-label {
+    font-size: 0.72rem;
+  }
+  .legend-item {
+    touch-action: manipulation;
+  }
+  .site-footer {
+    padding: 16px;
     justify-content: flex-start;
   }
   .controls-mouse {
     display: none;
   }
 
-  /* Detail panel: full-height sheet from the bottom on mobile */
   .detail-panel {
     top: auto;
     right: 0;
@@ -1124,57 +877,34 @@ body.panel-open .scene-image img {
     height: 72vh;
     border-radius: 20px 20px 0 0;
     transform: translateY(calc(100% + 24px)) scale(0.97);
-  }
-
-  .detail-panel.visible {
-    transform: translateY(0) scale(1);
-  }
-
-  body.panel-open #viewer-container {
-    right: 0;
-  }
-
-  /* --- Performance: strip expensive backdrop-filter effects on mobile --- */
-
-  /* Detail panel: remove blur bleed from closed (off-screen) state and
-     reduce saturate cost; filter:blur on a translated element can bleed
-     into the visible viewport on some mobile browsers. */
-  .detail-panel {
+    /* off-screen blur bleeds into viewport on mobile — must be none */
     filter: none;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    /* Shorten transition — mobile repaints are slower */
     transition:
       opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
       transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   }
   .detail-panel.visible {
+    transform: translateY(0) scale(1);
     filter: none;
   }
 
-  /* Footer: backdrop-filter on an always-visible bar continuously forces a
-     compositor layer on mobile — swap to a solid/semi-opaque background. */
-  #footer {
+  .panel-open .viewer-container {
+    right: 0;
+  }
+
+  /* solid bg avoids continuous compositor layer cost on mobile */
+  .site-footer {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--bg-panel-solid);
     opacity: 0.92;
   }
 
-  /* Tooltip rarely appears on touch (no hover), so drop its blur too. */
-  #tooltip {
+  .tooltip {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--bg-panel-solid);
-  }
-
-  /* Reduce legend label size to limit line-wrapping on narrow screens */
-  .legend-label {
-    font-size: 0.72rem;
-  }
-
-  /* Fast tap response for legend toggle buttons */
-  .legend-item {
-    touch-action: manipulation;
   }
 }

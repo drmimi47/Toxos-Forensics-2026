@@ -1,18 +1,11 @@
-/**
- * viewer.js – Sets up the Three.js scene, camera, renderer, controls, and lights.
- */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import CONFIG from '../config/config.js';
 
-/** Create and return all core viewer objects. */
 export function createViewer() {
   const container = document.getElementById('viewer-container');
 
-  // ---- Renderer ----
-  // On mobile: skip antialias (big GPU win) and cap DPR at 1.5 (3× phones would
-  // otherwise render 9× as many pixels for a barely perceptible quality bump).
   const isMobile = window.innerWidth <= 640;
   const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
@@ -22,7 +15,6 @@ export function createViewer() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
 
-  // ---- CSS2D overlay renderer (labels that always face the camera) ----
   const labelRenderer = new CSS2DRenderer();
   labelRenderer.setSize(container.clientWidth, container.clientHeight);
   labelRenderer.domElement.style.position = 'absolute';
@@ -32,30 +24,27 @@ export function createViewer() {
   labelRenderer.domElement.id = 'label-renderer';
   container.appendChild(labelRenderer.domElement);
 
-  // ---- Scene ----
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeeeeee);
 
-  // ---- Camera (Isometric / Orthographic) ----
   const aspect = container.clientWidth / container.clientHeight;
-  const frustumSize = CONFIG.camera.orthoSize || 4000; // half-height in world units
+  const frustumSize = CONFIG.camera.orthoSize || 4000;
   const camera = new THREE.OrthographicCamera(
-    -frustumSize * aspect,   // left
-    frustumSize * aspect,   // right
-    frustumSize,             // top
-    -frustumSize,             // bottom
+    -frustumSize * aspect,
+    frustumSize * aspect,
+    frustumSize,
+    -frustumSize,
     CONFIG.camera.near,
     CONFIG.camera.far
   );
 
-  // True isometric angle: rotate 45° around Y, then ~35.264° down (arctan(1/√2))
+  // True isometric angle: 45° around Y, ~35.264° down (arctan(1/√2))
   const isoDist = 8000;
-  const isoY = isoDist * Math.sin(Math.atan(1 / Math.SQRT2)); // ≈ elevation
-  const isoXZ = isoDist * Math.cos(Math.atan(1 / Math.SQRT2)); // ≈ ground offset
+  const isoY = isoDist * Math.sin(Math.atan(1 / Math.SQRT2));
+  const isoXZ = isoDist * Math.cos(Math.atan(1 / Math.SQRT2));
   camera.position.set(isoXZ, isoY, isoXZ);
   camera.lookAt(0, 0, 0);
 
-  // ---- Controls ----
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.28;
@@ -63,68 +52,51 @@ export function createViewer() {
   controls.panSpeed = 0.8;
   controls.zoomSpeed = 1.2;
   controls.enableZoom = true;
-  // For ortho cameras OrbitControls zooms by scaling the frustum
   controls.minZoom = 0.50;
   controls.maxZoom = 25;
   controls.maxPolarAngle = Math.PI / 2.05;
 
-  // ---- Lights ----
-  // Soft ambient base
   const ambient = new THREE.AmbientLight(0xffffff, 0.55);
   scene.add(ambient);
 
-  // Main directional (warm sunlight from upper-right)
   const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.1);
   sunLight.position.set(4000, 12000, 6000);
   scene.add(sunLight);
 
-  // Secondary fill (cool, opposite side to reduce harsh shadows)
   const fillLight = new THREE.DirectionalLight(0xc8d8ec, 0.4);
   fillLight.position.set(-5000, 6000, -4000);
   scene.add(fillLight);
 
-  // Hemisphere – warm sky / cool ground for natural tonal range
   const hemi = new THREE.HemisphereLight(0xe8e4dc, 0x8a9080, 0.5);
   scene.add(hemi);
 
-  // ---- Resize handler ----
-  // Pending renderer dimensions – updated by ResizeObserver every frame of the
-  // CSS transition; consumed inside animate() so the canvas clear + redraw are
-  // atomic and never produce a visible blank frame.
   let pendingW = 0, pendingH = 0;
 
-  // ---- Panel shift state ----
-  // When the detail card opens we shift + slightly shrink the camera frustum so
-  // the scene re-centres in the visible area and appears a touch smaller.
-  const PANEL_PX = 404;   // visual width the open card occupies (px)
-  let panelT = 0;          // 0 = closed, 1 = fully open
+  const PANEL_PX = 404;
+  let panelT = 0;
   let panelTarget = 0;
   let panelPrevTime = performance.now();
-  let _baseHalfH = 0;          // camera.top captured after frameBoundingBox
+  let _baseHalfH = 0;
 
   /**
    * Shift + scale the orthographic frustum so the scene appears centred in
-   * the remaining visible area and slightly zoomed out when the panel is open.
+   * the remaining visible area when the detail panel is open.
    *
    * Shift derivation: for the world origin to appear at NDC x = –P/W
    *   left  = –f + shift,  right = f + shift
    *   NDC(0) = –(right+left)/(right–left) = –shift/f  →  shift = P·f/W ✓
    */
   function applyPanelToCamera() {
-    const base = _baseHalfH || camera.top;  // post-framing half-height
+    const base = _baseHalfH || camera.top;
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
     const a = w / h;
-    const scale = 1 + 0.12 * panelT;       // expand frustum → objects appear smaller
+    const scale = 1 + 0.12 * panelT;
     const halfH = base * scale;
     const halfW = halfH * a;
 
     if (w <= 640) {
-      // Mobile: bottom sheet at 72 vh — shift frustum up so scene centres in top 28 %.
-      // Derivation (analogous to horizontal case):
-      //   NDC_y(origin) = –s / halfH  →  want that = PANEL_FRAC * panelT
-      //   ∴  s = –PANEL_FRAC * panelT * halfH
       const PANEL_FRAC = 0.72;
       const s = -(PANEL_FRAC * panelT) * halfH;
       camera.top = halfH + s;
@@ -132,7 +104,6 @@ export function createViewer() {
       camera.left = -halfW;
       camera.right = halfW;
     } else {
-      // Desktop: right card at 404 px — shift frustum right so scene centres in remaining area.
       const P = PANEL_PX * panelT;
       const shift = P * halfW / w;
       camera.top = halfH;
@@ -147,55 +118,38 @@ export function createViewer() {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (w === 0 || h === 0) return;
-
-    // Recompute frustum (incorporates current panelT).
-    // Pure math op – no canvas side-effects.
     applyPanelToCamera();
-
-    // Mark renderer resize pending; animate() will consume this once per frame
-    // right before renderer.render(), so the canvas is never left blank.
     pendingW = w;
     pendingH = h;
   }
 
-  // Fire on true window resize (browser chrome, orientation change, etc.)
   window.addEventListener('resize', handleResize);
-
-  // Also fire whenever the container itself resizes.
   new ResizeObserver(handleResize).observe(container);
 
-  // Listen for panel open / close to start the camera animation
   window.addEventListener('detail-open', () => {
-    if (!_baseHalfH) _baseHalfH = camera.top;  // capture once, post-framing
+    if (!_baseHalfH) _baseHalfH = camera.top;
     panelTarget = 1;
     panelPrevTime = performance.now();
   });
   window.addEventListener('detail-close', (e) => {
-    // Only unshift the camera when the very last panel has closed.
-    // With multi-panel, intermediate closes carry panelCount > 0.
     if ((e.detail?.panelCount ?? 0) === 0) {
       panelTarget = 0;
       panelPrevTime = performance.now();
     }
   });
 
-  // ---- Double-click → toggle between top-down and isometric home view ----
   let topDownAnim = null;
   let homeState = null;
 
-  /** Store the post-framing isometric camera state so we can return to it. */
   function setHomeState(pos, target) {
     homeState = { pos: pos.clone(), target: target.clone() };
   }
 
-  // Shared handler for both desktop dblclick and mobile double-tap.
   function handleDoubleActivate() {
     if (document.body.classList.contains('dissected-mode')) return;
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
 
-    // Detect if camera is already in top-down view:
-    // when near-vertical, the XZ offset from the target is a tiny fraction of dist.
     const toCamera = camera.position.clone().sub(target);
     const xzLen = Math.sqrt(toCamera.x * toCamera.x + toCamera.z * toCamera.z);
     const isTopDown = xzLen / dist < 0.08;
@@ -203,7 +157,6 @@ export function createViewer() {
     if (topDownAnim) topDownAnim.done = true;
 
     if (isTopDown && homeState) {
-      // Already top-down → animate back to isometric home
       const endPos = homeState.pos.clone();
       const homeTarget = homeState.target.clone();
       const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, homeTarget, new THREE.Vector3(0, 1, 0));
@@ -216,8 +169,7 @@ export function createViewer() {
         t0: performance.now(), duration: 800, done: false
       };
     } else {
-      // Animate to top-down view.
-      // Tiny Z offset avoids gimbal-lock singularity when OrbitControls resumes.
+      // Tiny Z offset avoids gimbal-lock singularity when OrbitControls resumes
       const endPos = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
       const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 0, -1));
       const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
@@ -232,26 +184,20 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  // Desktop: native double-click on the canvas
   renderer.domElement.addEventListener('dblclick', handleDoubleActivate);
-  // Mobile: custom event dispatched by utils.js double-tap detector
   window.addEventListener('double-tap', handleDoubleActivate);
 
-  // ---- DISSECTED scroll-to-tilt system ----
-  // Scroll wheel changes the camera's polar angle (elevation) while keeping
-  // azimuth fixed — effectively tilting the model between isometric and top-down
-  // without any horizontal rotation.
   let _tiltActive        = false;
-  let _tiltNeedsSnapshot = false; // re-snapshot after goDissectedView anim settles
-  let _tiltCurrentTheta  = 0;    // current polar angle from Y axis (radians)
-  let _tiltTargetTheta   = 0;    // desired polar angle (scrolled toward)
-  let _tiltPhi           = 0;    // fixed azimuth (radians)
-  let _tiltR             = 0;    // fixed camera-to-target distance
+  let _tiltNeedsSnapshot = false;
+  let _tiltCurrentTheta  = 0;
+  let _tiltTargetTheta   = 0;
+  let _tiltPhi           = 0;
+  let _tiltR             = 0;
 
-  const TILT_THETA_MIN = 0.05;   // ~3° from vertical  (near top-down)
-  const TILT_THETA_MAX = 1.45;   // ~83° from vertical (near horizon)
-  const TILT_SPEED     = 0.0007; // radians per deltaY pixel (~4° per mouse notch)
-  const TILT_LERP      = 0.10;   // smoothing per frame
+  const TILT_THETA_MIN = 0.05;
+  const TILT_THETA_MAX = 1.45;
+  const TILT_SPEED     = 0.0007;
+  const TILT_LERP      = 0.10;
 
   function _snapshotTilt() {
     const offset = camera.position.clone().sub(controls.target);
@@ -265,8 +211,8 @@ export function createViewer() {
     if (!_tiltActive) return;
     e.preventDefault();
     let delta = e.deltaY;
-    if (e.deltaMode === 1) delta *= 20;   // line mode → pixels
-    if (e.deltaMode === 2) delta *= 600;  // page mode → pixels
+    if (e.deltaMode === 1) delta *= 20;
+    if (e.deltaMode === 2) delta *= 600;
     _tiltTargetTheta = THREE.MathUtils.clamp(
       _tiltTargetTheta + delta * TILT_SPEED,
       TILT_THETA_MIN,
@@ -275,8 +221,6 @@ export function createViewer() {
   }
   renderer.domElement.addEventListener('wheel', _onTiltWheel, { passive: false });
 
-  /** Enable or disable DISSECTED scroll-to-tilt. Call with true on DISSECTED enter,
-   *  false on exit. The snapshot is deferred until goDissectedView() animation settles. */
   function enableDissectedTilt(enable) {
     _tiltActive = enable;
     if (enable) _tiltNeedsSnapshot = true;
@@ -288,16 +232,12 @@ export function createViewer() {
       : 1 - Math.pow(-2 * t + 2, 4) / 2;
   }
 
-  // ---- Render loop ----
-  /** @type {Function|null} per-frame sprite-scale updater, set by setupTooltips */
   let _tickSprites = null;
   function setTickSprites(fn) { _tickSprites = fn; }
 
   function animate() {
     requestAnimationFrame(animate);
 
-    // Flush any pending renderer resize here – immediately before rendering –
-    // so the canvas clear and the redraw are in the same frame and never visible.
     if (pendingW > 0) {
       renderer.setSize(pendingW, pendingH);
       labelRenderer.setSize(pendingW, pendingH);
@@ -305,11 +245,8 @@ export function createViewer() {
       pendingH = 0;
     }
 
-    // Ease-in-out panel frustum shift
     {
-      // Animate panelT over a fixed duration
-      const duration = 0.38; // seconds
-      // Store animation start time and initial value
+      const duration = 0.38;
       if (typeof animate.panelAnim === 'undefined') animate.panelAnim = null;
       if (panelT !== panelTarget && !animate.panelAnim) {
         animate.panelAnim = {
@@ -337,33 +274,27 @@ export function createViewer() {
       const t = Math.min((performance.now() - a.t0) / a.duration, 1);
       const e = easeInOutQuart(t);
 
-      // Slerp quaternion instead of per-frame lookAt → no gimbal-lock jitter
       camera.position.lerpVectors(a.startPos, a.endPos, e);
       camera.quaternion.slerpQuaternions(a.startQuat, a.endQuat, e);
 
       if (t >= 1) {
-        // Drain any residual OrbitControls damping so it can't jiggle
         controls.enabled = true;
         controls.target.copy(a.target);
         const wasDamping = controls.enableDamping;
         controls.enableDamping = false;
-        controls.update();          // flushes internal sphericalDelta to zero
+        controls.update();
         controls.enableDamping = wasDamping;
 
-        // Force the exact final pose (overrides whatever update() just did)
         camera.position.copy(a.endPos);
         camera.quaternion.copy(a.endQuat);
 
         a.done = true;
-        // Next frame: controls.update() starts from this position with zero deltas
       }
     } else {
-      // Snapshot tilt state on the first frame after goDissectedView() settles
       if (_tiltActive && _tiltNeedsSnapshot) {
         _snapshotTilt();
         _tiltNeedsSnapshot = false;
       }
-      // Smoothly lerp camera elevation toward the scroll target
       if (_tiltActive && Math.abs(_tiltCurrentTheta - _tiltTargetTheta) > 0.0001) {
         _tiltCurrentTheta = THREE.MathUtils.lerp(_tiltCurrentTheta, _tiltTargetTheta, TILT_LERP);
         const sinT = Math.sin(_tiltCurrentTheta);
@@ -384,7 +315,6 @@ export function createViewer() {
   }
   animate();
 
-  /** Smoothly animate the camera back to the post-framing isometric home state. */
   function goHome() {
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
@@ -401,13 +331,6 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  /**
-   * Like goHome() but shifts the camera and its target upward in world Y by
-   * yOffset units so the model sits closer to the bottom of the screen.
-   * Tilt, zoom, and azimuth are unchanged.
-   *
-   * Tune yOffset to taste — larger values push the model further down.
-   */
   function goDissectedView(yOffset = 1200) {
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
@@ -425,18 +348,12 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  /**
-   * Like goHome() but with the camera tilted more to the side (lower elevation)
-   * for the FATBERG bare-model view. Reduces the Y component of the home
-   * direction vector so the viewpoint sits closer to the horizon.
-   */
   function goFatbergView() {
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
     const target = homeState.target.clone();
     const dist = homeState.pos.distanceTo(target);
-    // Flatten the isometric direction: keep XZ azimuth, pull Y down to ~60% of its
-    // home value (shifts elevation from ~35° to ~22° — noticeably more side-on).
+    // Flatten isometric direction: keep XZ azimuth, pull Y to ~60% (shifts elevation from ~35° to ~22°)
     const homeDir = homeState.pos.clone().sub(target).normalize();
     const flatDir = new THREE.Vector3(homeDir.x, homeDir.y * 0.6, homeDir.z).normalize();
     const endPos = target.clone().addScaledVector(flatDir, dist);
@@ -451,7 +368,6 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  /** Animate the camera to a straight-down top view (same angle as double-click). */
   function goTopDown() {
     if (topDownAnim) topDownAnim.done = true;
     const target = controls.target.clone();

@@ -1,0 +1,79 @@
+/* @property required for CSS transitions on custom color properties */
+@property --bg-dark {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6d2ca;
+}
+@property --bg-panel {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.45);
+}
+@property --border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(4, 22, 118, 0.1);
+}
+@property --border-bright {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(4, 22, 118, 0.18);
+}
+@property --text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1a1a2a;
+}
+@property --text-dim {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6b6b7a;
+}
+
+:root {
+  --accent:           #a7ce08;                  /* primary brand / highlight */
+  --accent-dim:       #4d5c04;                  /* muted accent (scrollbar thumb) */
+  --accent-glow:      rgba(102, 123, 5, 0.25);  /* glow behind accent elements */
+  --bg-dark:          #eeeeee;                  /* 3D viewport and page background */
+  --bg-panel:         rgba(255, 255, 255, 0.8); /* frosted-glass panels and overlays */
+  --bg-panel-solid:   #ffffff;                  /* solid fallback for panels (mobile footer) */
+  --border:           rgba(4, 22, 118, 0.1);    /* subtle borders */
+  --border-bright:    rgba(4, 22, 118, 0.18);   /* prominent borders (tooltip, panel edge) */
+  --text:             #1a1a1a;                  /* primary body text */
+  --text-dim:         #6b6b6a;                  /* secondary / muted text */
+  --scene-image-brightness: 1;                  /* 3D scene image filter (< 1 darkens) */
+  --cso-color:        #00ffff;                  /* CSO dataset — marker dots and annotations */
+  --npdes-color:      #ff3800;                  /* NPDES dataset — marker dots and annotations */
+  --rcra-color:       #515b28;                  /* RCRA dataset — marker dots and annotations */
+  --label:            #000000;                  /* 3D scene text labels (borough names, rivers) */
+}
+
+body.dark {
+  --bg-dark:          #0c0c0c;
+  --bg-panel:         rgba(30, 30, 30, 0.8);
+  --bg-panel-solid:   #111111;
+  --border:           rgba(255, 255, 255, 0.08);
+  --border-bright:    rgba(255, 255, 255, 0.15);
+  --text:             #e8e8e8;
+  --text-dim:         #888888;
+  --scene-image-brightness: 0.5;
+}
+
+body.dark {
+  --cso-color:   #FF0000;
+  --npdes-color: #00FF00;
+  --rcra-color:  #b1c074;
+}
+
+body.dark .footer-controls .key {
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.5s ease;
+}
+
+body.dark .dp-meta-grid {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.legend-dot.cso   { background: var(--cso-color);   }
+.legend-dot.npdes { background: var(--npdes-color);  }
+.legend-dot.rcra  { background: var(--rcra-color);   }
