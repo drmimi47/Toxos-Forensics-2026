@@ -418,14 +418,20 @@ export function createViewer() {
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
     const offset = new THREE.Vector3(0, yOffset, 0);
-    const endPos = homeState.pos.clone().add(offset);
-    const endTarget = homeState.target.clone().add(offset);
-    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, endTarget, new THREE.Vector3(0, 1, 0));
+    const target = homeState.target.clone().add(offset);
+    const dist = homeState.pos.distanceTo(homeState.target);
+
+    // Flatten isometric direction: pull Y up to 1.15 (~15% steeper) to match visual constraints requested
+    const homeDir = homeState.pos.clone().sub(homeState.target).normalize();
+    const steepDir = new THREE.Vector3(homeDir.x, homeDir.y * 1.15, homeDir.z).normalize();
+
+    const endPos = target.clone().addScaledVector(steepDir, dist);
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 1, 0));
     const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
     topDownAnim = {
       startPos: camera.position.clone(), endPos,
       startQuat: camera.quaternion.clone(), endQuat,
-      target: endTarget,
+      target: target,
       t0: performance.now(), duration: 900, done: false
     };
     controls.enabled = false;
@@ -437,9 +443,9 @@ export function createViewer() {
     if (topDownAnim) topDownAnim.done = true;
     const target = homeState.target.clone();
     const dist = homeState.pos.distanceTo(target);
-    // Flatten isometric direction: keep XZ azimuth, pull Y to ~60% (shifts elevation from ~35° to ~22°)
+    // Flatten isometric direction: keep XZ azimuth, pull Y up to 0.75 to look down more directly than before
     const homeDir = homeState.pos.clone().sub(target).normalize();
-    const flatDir = new THREE.Vector3(homeDir.x, homeDir.y * 0.6, homeDir.z).normalize();
+    const flatDir = new THREE.Vector3(homeDir.x, homeDir.y * 0.75, homeDir.z).normalize();
     const endPos = target.clone().addScaledVector(flatDir, dist);
     const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 1, 0));
     const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
