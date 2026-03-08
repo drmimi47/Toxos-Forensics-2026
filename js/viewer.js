@@ -38,9 +38,9 @@ export function createViewer() {
     CONFIG.camera.near,
     CONFIG.camera.far
   );
-
+// camera perspective angle
   const perspCamera = new THREE.PerspectiveCamera(
-    45,
+    35,
     aspect,
     CONFIG.camera.near,
     CONFIG.camera.far
@@ -176,6 +176,7 @@ export function createViewer() {
   new ResizeObserver(handleResize).observe(container);
 
   window.addEventListener('detail-open', () => {
+    if (document.body.classList.contains('collage-mode')) return;
     const camera = activeCamera;
     if (!_baseHalfH && camera.isOrthographicCamera) _baseHalfH = camera.top;
     panelTarget = 1;
@@ -198,6 +199,7 @@ export function createViewer() {
   function handleDoubleActivate() {
     const camera = activeCamera;
     if (document.body.classList.contains('dissected-mode')) return;
+    if (document.body.classList.contains('collage-mode')) return;
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
 
@@ -240,7 +242,7 @@ export function createViewer() {
 
   // ── Collage-mode two-finger trackpad pan ──────────────────────────────────
   let _collagePanActive = false;
-  const COLLAGE_PAN_SPEED = 1.8;
+  const COLLAGE_PAN_SPEED = 2.43;
 
   function _onCollagePanWheel(e) {
     if (!_collagePanActive) return;
@@ -248,6 +250,18 @@ export function createViewer() {
     e.preventDefault();
     e.stopImmediatePropagation(); // block OrbitControls zoom & tilt handler
 
+    // ctrlKey = trackpad pinch gesture → zoom
+    if (e.ctrlKey) {
+      let delta = e.deltaY;
+      if (e.deltaMode === 1) delta *= 20;
+      if (e.deltaMode === 2) delta *= 300;
+      const factor = Math.pow(0.98, delta);
+      camera.zoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, camera.zoom * factor));
+      camera.updateProjectionMatrix();
+      return;
+    }
+
+    // Two-finger pan
     const scale = COLLAGE_PAN_SPEED / camera.zoom;
 
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
@@ -262,6 +276,36 @@ export function createViewer() {
   }
   // Register BEFORE tilt & OrbitControls so it can stopImmediatePropagation
   renderer.domElement.addEventListener('wheel', _onCollagePanWheel, { passive: false });
+
+  // ── Collage-mode pinch-to-zoom (touch only) ───────────────────────────────
+  let _pinchActive = false;
+  let _pinchStartDist = 0;
+  let _pinchStartZoom = 1;
+
+  function _pinchDist(e) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  renderer.domElement.addEventListener('touchstart', (e) => {
+    if (!_collagePanActive || e.touches.length !== 2) return;
+    _pinchActive = true;
+    _pinchStartDist = _pinchDist(e);
+    _pinchStartZoom = activeCamera.zoom;
+  }, { passive: true });
+
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if (!_collagePanActive || !_pinchActive || e.touches.length !== 2) return;
+    e.preventDefault();
+    const scale = _pinchDist(e) / _pinchStartDist;
+    activeCamera.zoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, _pinchStartZoom * scale));
+    activeCamera.updateProjectionMatrix();
+  }, { passive: false });
+
+  renderer.domElement.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) _pinchActive = false;
+  }, { passive: true });
 
   function enableCollagePan(enable) { _collagePanActive = enable; }
 
@@ -402,6 +446,11 @@ export function createViewer() {
     if (topDownAnim) topDownAnim.done = true;
     const endPos = homeState.pos.clone();
     const homeTarget = homeState.target.clone();
+    // Perspective (recorded/remediated): shift target down so model sits higher on screen.
+    if (camera.isPerspectiveCamera) {
+      const dist = endPos.distanceTo(homeTarget);
+      homeTarget.y -= dist * 0.08;
+    }
     const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, homeTarget, new THREE.Vector3(0, 1, 0));
     const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
     topDownAnim = {

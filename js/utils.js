@@ -425,10 +425,15 @@ export function frameBoundingBox(object, camera, controls) {
     camera.right = maxDim * aspect;
     camera.updateProjectionMatrix();
   } else {
+    // True isometric angle: 45° azimuth, arctan(1/√2) ≈ 35.26° elevation.
+    // Equal components → unit direction (1/√3, 1/√3, 1/√3).
+    const maxHoriz = Math.max(size.x, size.z);
+    const dist = maxHoriz * 1.8;
+    const f = 1 / Math.sqrt(3);
     camera.position.set(
-      center.x + size.x * 0.6,
-      center.y + size.y * 2.0,
-      center.z + size.z * 0.6
+      center.x + dist * f,
+      center.y + dist * f,
+      center.z + dist * f
     );
   }
   controls.update();

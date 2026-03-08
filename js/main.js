@@ -75,6 +75,13 @@ async function init() {
     const modelBox = new THREE.Box3().setFromObject(model);
     frameBoundingBox(model, getCamera(), controls);
     setHomeState(getCamera().position, controls.target);
+    // Shift perspective target down for recorded/remediated initial view only.
+    // Done AFTER setHomeState so dissected/fatberg homeState is unaffected.
+    if (getCamera().isPerspectiveCamera) {
+      const _d = getCamera().position.distanceTo(controls.target);
+      controls.target.y -= _d * 0.08;
+      controls.update();
+    }
     const homeZoom = getCamera().zoom;
 
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
