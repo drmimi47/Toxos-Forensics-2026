@@ -29,7 +29,8 @@ export function createViewer() {
 
   const aspect = container.clientWidth / container.clientHeight;
   const frustumSize = CONFIG.camera.orthoSize || 4000;
-  const camera = new THREE.OrthographicCamera(
+
+  const orthoCamera = new THREE.OrthographicCamera(
     -frustumSize * aspect,
     frustumSize * aspect,
     frustumSize,
@@ -38,14 +39,45 @@ export function createViewer() {
     CONFIG.camera.far
   );
 
+  const perspCamera = new THREE.PerspectiveCamera(
+    45,
+    aspect,
+    CONFIG.camera.near,
+    CONFIG.camera.far
+  );
+
   // True isometric angle: 45° around Y, ~35.264° down (arctan(1/√2))
   const isoDist = 8000;
   const isoY = isoDist * Math.sin(Math.atan(1 / Math.SQRT2));
   const isoXZ = isoDist * Math.cos(Math.atan(1 / Math.SQRT2));
-  camera.position.set(isoXZ, isoY, isoXZ);
-  camera.lookAt(0, 0, 0);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
+  orthoCamera.position.set(isoXZ, isoY, isoXZ);
+  orthoCamera.lookAt(0, 0, 0);
+
+  perspCamera.position.set(isoXZ, isoY, isoXZ);
+  perspCamera.lookAt(0, 0, 0);
+
+  let activeCamera = perspCamera; // recorded mode starts in perspective
+
+  function setCameraMode(isPerspective) {
+    const nextCamera = isPerspective ? perspCamera : orthoCamera;
+    if (activeCamera === nextCamera) return;
+
+    nextCamera.position.copy(activeCamera.position);
+    nextCamera.quaternion.copy(activeCamera.quaternion);
+    nextCamera.zoom = activeCamera.zoom;
+    nextCamera.updateProjectionMatrix();
+
+    activeCamera = nextCamera;
+    controls.object = activeCamera;
+    controls.update();
+  }
+
+  function getCamera() {
+    return activeCamera;
+  }
+
+  const controls = new OrbitControls(activeCamera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.28;
   controls.rotateSpeed = 0.6;
@@ -87,29 +119,46 @@ export function createViewer() {
    *   NDC(0) = –(right+left)/(right–left) = –shift/f  →  shift = P·f/W ✓
    */
   function applyPanelToCamera() {
-    const base = _baseHalfH || camera.top;
+    const camera = activeCamera;
+    if (!camera.isOrthographicCamera && !camera.isPerspectiveCamera) return;
+
+    const base = _baseHalfH || (camera.isOrthographicCamera ? camera.top : 2000);
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
     const a = w / h;
     const scale = 1 + 0.12 * panelT;
-    const halfH = base * scale;
-    const halfW = halfH * a;
 
-    if (w <= 640) {
-      const PANEL_FRAC = 0.72;
-      const s = -(PANEL_FRAC * panelT) * halfH;
-      camera.top = halfH + s;
-      camera.bottom = -halfH + s;
-      camera.left = -halfW;
-      camera.right = halfW;
+    if (camera.isOrthographicCamera) {
+      const halfH = base * scale;
+      const halfW = halfH * a;
+
+      if (w <= 640) {
+        const PANEL_FRAC = 0.72;
+        const s = -(PANEL_FRAC * panelT) * halfH;
+        camera.top = halfH + s;
+        camera.bottom = -halfH + s;
+        camera.left = -halfW;
+        camera.right = halfW;
+      } else {
+        const P = PANEL_PX * panelT;
+        const shift = P * halfW / w;
+        camera.top = halfH;
+        camera.bottom = -halfH;
+        camera.left = -halfW + shift;
+        camera.right = halfW + shift;
+      }
     } else {
-      const P = PANEL_PX * panelT;
-      const shift = P * halfW / w;
-      camera.top = halfH;
-      camera.bottom = -halfH;
-      camera.left = -halfW + shift;
-      camera.right = halfW + shift;
+      camera.aspect = a;
+      // Provide basic aspect update, panel shifts not beautifully supported out-of-box for Persp yet
+      // but it looks OK if we ignore view-offset.  
+      if (w > 640 && panelT > 0) {
+        // Perspective shift using setViewOffset
+        const pixelShift = PANEL_PX * panelT;
+        camera.setViewOffset(w, h, -pixelShift / 2, 0, w, h);
+      } else {
+        camera.clearViewOffset();
+      }
     }
     camera.updateProjectionMatrix();
   }
@@ -127,7 +176,8 @@ export function createViewer() {
   new ResizeObserver(handleResize).observe(container);
 
   window.addEventListener('detail-open', () => {
-    if (!_baseHalfH) _baseHalfH = camera.top;
+    const camera = activeCamera;
+    if (!_baseHalfH && camera.isOrthographicCamera) _baseHalfH = camera.top;
     panelTarget = 1;
     panelPrevTime = performance.now();
   });
@@ -146,6 +196,7 @@ export function createViewer() {
   }
 
   function handleDoubleActivate() {
+    const camera = activeCamera;
     if (document.body.classList.contains('dissected-mode')) return;
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
@@ -187,24 +238,53 @@ export function createViewer() {
   renderer.domElement.addEventListener('dblclick', handleDoubleActivate);
   window.addEventListener('double-tap', handleDoubleActivate);
 
-  let _tiltActive        = false;
+  // ── Collage-mode two-finger trackpad pan ──────────────────────────────────
+  let _collagePanActive = false;
+  const COLLAGE_PAN_SPEED = 1.8;
+
+  function _onCollagePanWheel(e) {
+    if (!_collagePanActive) return;
+    const camera = activeCamera;
+    e.preventDefault();
+    e.stopImmediatePropagation(); // block OrbitControls zoom & tilt handler
+
+    const scale = COLLAGE_PAN_SPEED / camera.zoom;
+
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+
+    const panDelta = new THREE.Vector3()
+      .addScaledVector(right, e.deltaX * scale)
+      .addScaledVector(up, -e.deltaY * scale);
+
+    camera.position.add(panDelta);
+    controls.target.add(panDelta);
+  }
+  // Register BEFORE tilt & OrbitControls so it can stopImmediatePropagation
+  renderer.domElement.addEventListener('wheel', _onCollagePanWheel, { passive: false });
+
+  function enableCollagePan(enable) { _collagePanActive = enable; }
+
+  // ── Dissected-mode tilt ───────────────────────────────────────────────────
+  let _tiltActive = false;
   let _tiltNeedsSnapshot = false;
-  let _tiltCurrentTheta  = 0;
-  let _tiltTargetTheta   = 0;
-  let _tiltPhi           = 0;
-  let _tiltR             = 0;
+  let _tiltCurrentTheta = 0;
+  let _tiltTargetTheta = 0;
+  let _tiltPhi = 0;
+  let _tiltR = 0;
 
   const TILT_THETA_MIN = 0.05;
   const TILT_THETA_MAX = 1.45;
-  const TILT_SPEED     = 0.0007;
-  const TILT_LERP      = 0.10;
+  const TILT_SPEED = 0.0007;
+  const TILT_LERP = 0.10;
 
   function _snapshotTilt() {
+    const camera = activeCamera;
     const offset = camera.position.clone().sub(controls.target);
-    _tiltR            = offset.length();
+    _tiltR = offset.length();
     _tiltCurrentTheta = Math.acos(THREE.MathUtils.clamp(offset.y / _tiltR, -1, 1));
-    _tiltPhi          = Math.atan2(offset.x, offset.z);
-    _tiltTargetTheta  = _tiltCurrentTheta;
+    _tiltPhi = Math.atan2(offset.x, offset.z);
+    _tiltTargetTheta = _tiltCurrentTheta;
   }
 
   function _onTiltWheel(e) {
@@ -269,6 +349,7 @@ export function createViewer() {
       }
     }
 
+    const camera = activeCamera;
     if (topDownAnim && !topDownAnim.done) {
       const a = topDownAnim;
       const t = Math.min((performance.now() - a.t0) / a.duration, 1);
@@ -316,6 +397,7 @@ export function createViewer() {
   animate();
 
   function goHome() {
+    const camera = activeCamera;
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
     const endPos = homeState.pos.clone();
@@ -332,10 +414,11 @@ export function createViewer() {
   }
 
   function goDissectedView(yOffset = 1200) {
+    const camera = activeCamera;
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
-    const offset   = new THREE.Vector3(0, yOffset, 0);
-    const endPos   = homeState.pos.clone().add(offset);
+    const offset = new THREE.Vector3(0, yOffset, 0);
+    const endPos = homeState.pos.clone().add(offset);
     const endTarget = homeState.target.clone().add(offset);
     const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, endTarget, new THREE.Vector3(0, 1, 0));
     const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
@@ -349,6 +432,7 @@ export function createViewer() {
   }
 
   function goFatbergView() {
+    const camera = activeCamera;
     if (!homeState) return;
     if (topDownAnim) topDownAnim.done = true;
     const target = homeState.target.clone();
@@ -369,6 +453,7 @@ export function createViewer() {
   }
 
   function goTopDown() {
+    const camera = activeCamera;
     if (topDownAnim) topDownAnim.done = true;
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
@@ -384,5 +469,5 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  return { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt };
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan };
 }

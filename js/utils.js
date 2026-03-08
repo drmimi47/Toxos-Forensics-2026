@@ -7,10 +7,10 @@ const pointer = new THREE.Vector2();
 
 function overlayActive() {
   return document.getElementById('credits-overlay')?.classList.contains('visible') ||
-         document.getElementById('about-overlay')?.classList.contains('visible');
+    document.getElementById('about-overlay')?.classList.contains('visible');
 }
 
-export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) {
+export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissected) {
   const DIM_OPACITY = 0.3;
   const FULL_OPACITY = 1.0;
   const HOVER_SCALE = 1.5;
@@ -102,11 +102,16 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
   }
 
   function getBaseSize() {
+    const camera = typeof getCamera === 'function' ? getCamera() : getCamera;
     if (camera.isOrthographicCamera) {
       const frustumH = (camera.top - camera.bottom) / (camera.zoom || 1);
       return CONFIG.marker.screenSize * frustumH;
     }
-    return CONFIG.marker.screenSize;
+    // Calculate the frustum height at the center of the scene
+    const distance = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
+    const vFov = (camera.fov * Math.PI) / 180;
+    const frustumH = 2 * Math.tan(vFov / 2) * distance / (camera.zoom || 1);
+    return CONFIG.marker.screenSize * frustumH;
   }
 
   let _groupCache = null;
@@ -138,7 +143,7 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
       const gy = group.position.y;
       for (const sprite of group.children) {
         _tmpVec3.set(sprite.position.x, sprite.position.y + gy, sprite.position.z);
-        _tmpVec3.project(camera);
+        _tmpVec3.project(typeof getCamera === 'function' ? getCamera() : getCamera);
         if (_tmpVec3.z > 1) continue;
         const px = ((_tmpVec3.x + 1) / 2) * cw + canvasRect.left;
         const py = ((1 - _tmpVec3.y) / 2) * ch + canvasRect.top;
@@ -237,6 +242,7 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
     pointer.x = ((effX - canvasRect.left) / canvasRect.width) * 2 - 1;
     pointer.y = -((effY - canvasRect.top) / canvasRect.height) * 2 + 1;
 
+    const camera = typeof getCamera === 'function' ? getCamera() : getCamera;
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
 
@@ -294,8 +300,8 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
         _zPos[0] = wp.x; _zPos[1] = wp.y; _zPos[2] = modelBox.min.z;
         _zPos[3] = wp.x; _zPos[4] = wp.y; _zPos[5] = modelBox.max.z;
         _zGeom.attributes.position.needsUpdate = true;
-        _yPos[0] = wp.x; _yPos[1] = wp.y;           _yPos[2] = wp.z;
-        _yPos[3] = wp.x; _yPos[4] = modelBox.min.y;  _yPos[5] = wp.z;
+        _yPos[0] = wp.x; _yPos[1] = wp.y; _yPos[2] = wp.z;
+        _yPos[3] = wp.x; _yPos[4] = modelBox.min.y; _yPos[5] = wp.z;
         _yGeom.attributes.position.needsUpdate = true;
         _crossTarget = CROSS_OPACITY;
       } else {
@@ -372,6 +378,7 @@ export function setupTooltips(camera, scene, tooltipEl, modelBox, getDissected) 
       ((cx - clickRect.left) / clickRect.width) * 2 - 1,
       -((cy - clickRect.top) / clickRect.height) * 2 + 1
     );
+    const camera = typeof getCamera === 'function' ? getCamera() : getCamera;
     raycaster.setFromCamera(clickPtr, camera);
     const hits = raycaster.intersectObjects(scene.children, true);
     const hit = hits.find(i => i.object.userData?.type && i.object.parent?.visible !== false);

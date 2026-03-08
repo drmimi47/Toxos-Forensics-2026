@@ -14,11 +14,11 @@ import { createCollagePlanes } from "./collage.js";
 // labelColor:   hex color for anchored scene text (East River, borough names, etc.).
 // labelOpacity: opacity of the anchored scene text (0–1).
 const MODE_VISUALS = {
-  recorded:   { bg: '#111111', darkUI: true,  mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 },
+  recorded: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 },
   remediated: { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
-  fatberg:    { bg: '#ffffff', darkUI: false, mdT: 0, labelColor: '#000000', labelOpacity: 0.75 },
-  collage:    { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
-  dissected:  { bg: '#111111', darkUI: true,  mdT: 0, labelColor: '#ffffff', labelOpacity: 0.50 },
+  fatberg: { bg: '#ffffff', darkUI: false, mdT: 0, labelColor: '#000000', labelOpacity: 0.75 },
+  collage: { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
+  dissected: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.50 },
 };
 
 const preloaderEl = document.querySelector(".preloader");
@@ -49,7 +49,7 @@ async function init() {
 
   // If scene is not yet created, set after createViewer()
 
-  const { scene, camera, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan } = createViewer();
 
   // Set initial background color for the scene
   scene.background = new THREE.Color(initialVisuals.bg);
@@ -64,8 +64,8 @@ async function init() {
       scene,
       (pct) => {
         if (pct < 30) setProgress(10 + pct * 0.2, `Loading model geometry: ${Math.round(pct)}%`);
-        else if (pct < 60) setProgress(16 + (pct-30) * 0.2, `Loading model textures: ${Math.round(pct)}%`);
-        else setProgress(22 + (pct-60) * 0.5, `Finalizing 3D model: ${Math.round(pct)}%`);
+        else if (pct < 60) setProgress(16 + (pct - 30) * 0.2, `Loading model textures: ${Math.round(pct)}%`);
+        else setProgress(22 + (pct - 60) * 0.5, `Finalizing 3D model: ${Math.round(pct)}%`);
       },
       renderer,
     );
@@ -73,9 +73,9 @@ async function init() {
     setProgress(75, "Calculating model bounding box and camera framing");
 
     const modelBox = new THREE.Box3().setFromObject(model);
-    frameBoundingBox(model, camera, controls);
-    setHomeState(camera.position, controls.target);
-    const homeZoom = camera.zoom;
+    frameBoundingBox(model, getCamera(), controls);
+    setHomeState(getCamera().position, controls.target);
+    const homeZoom = getCamera().zoom;
 
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
     const csvResults = await loadAllCSV(scene);
@@ -161,9 +161,9 @@ async function init() {
     const _dissEls = [_dissectedSvg, _dissectedPanelsRight, _dissectedPanelsLeft];
 
     const _annData = [
-      { result: csvResults.cso,               name: 'CSO',   color: 'var(--cso-color)',   terminusIndex: null, lorem: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.' },
-      { result: csvResults.npdes,             name: 'NPDES', color: 'var(--npdes-color)', terminusIndex: null, lorem: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.' },
-      { result: csvResults.rcra_2263_clipped, name: 'RCRA',  color: 'var(--rcra-color)',  terminusIndex: 907, lorem: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.' },
+      { result: csvResults.cso, name: 'CSO', color: 'var(--cso-color)', terminusIndex: null, lorem: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.' },
+      { result: csvResults.npdes, name: 'NPDES', color: 'var(--npdes-color)', terminusIndex: null, lorem: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.' },
+      { result: csvResults.rcra_2263_clipped, name: 'RCRA', color: 'var(--rcra-color)', terminusIndex: 907, lorem: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.' },
     ].flatMap(({ result, name, color, terminusIndex, lorem }, i) => {
       const side = i % 2 === 0 ? 'right' : 'left';
 
@@ -203,7 +203,7 @@ async function init() {
         if (result?.group) result.group.visible = dissVisible;
         panel.classList.toggle('disabled', !dissVisible);
         svgLine.setAttribute('stroke-opacity', dissVisible ? '0.7' : '0.18');
-        svgDot.setAttribute('opacity',          dissVisible ? '1'   : '0.18');
+        svgDot.setAttribute('opacity', dissVisible ? '1' : '0.18');
         if (!dissVisible && new RegExp(name, 'i').test(getDetailType())) {
           closeDetail();
         }
@@ -219,9 +219,9 @@ async function init() {
       const rect = renderer.domElement.getBoundingClientRect();
       for (const ann of _annData) {
         ann.sprite.getWorldPosition(_dissVec);
-        const n = _dissVec.clone().project(camera);
-        const ax = rect.left + (n.x *  0.5 + 0.5) * rect.width;
-        const ay = rect.top  + (n.y * -0.5 + 0.5) * rect.height;
+        const n = _dissVec.clone().project(getCamera());
+        const ax = rect.left + (n.x * 0.5 + 0.5) * rect.width;
+        const ay = rect.top + (n.y * -0.5 + 0.5) * rect.height;
         const range = document.createRange();
         range.selectNodeContents(ann.nameEl);
         const nr = range.getBoundingClientRect();
@@ -230,7 +230,7 @@ async function init() {
         const by = nr.top + nr.height / 2;
         ann.svgLine.setAttribute('x1', ax); ann.svgLine.setAttribute('y1', ay);
         ann.svgLine.setAttribute('x2', bx); ann.svgLine.setAttribute('y2', by);
-        ann.svgDot.setAttribute('cx', ax);  ann.svgDot.setAttribute('cy', ay);
+        ann.svgDot.setAttribute('cx', ax); ann.svgDot.setAttribute('cy', ay);
       }
       _dissLineRafId = requestAnimationFrame(_tickDissLines);
     }
@@ -269,6 +269,7 @@ async function init() {
       let zoomRafId = null;
 
       function tickZoom() {
+        const camera = getCamera();
         const next = THREE.MathUtils.lerp(camera.zoom, zoomTarget, 0.08);
         if (Math.abs(next - zoomTarget) < 0.0001) {
           camera.zoom = zoomTarget;
@@ -292,7 +293,7 @@ async function init() {
         if (zoomRafId) {
           cancelAnimationFrame(zoomRafId);
           zoomRafId = null;
-          zoomTarget = camera.zoom;
+          zoomTarget = getCamera().zoom;
         }
       });
 
@@ -332,12 +333,12 @@ async function init() {
         }
 
         const startOp = toVisible ? 0 : 1;
-        const endOp   = toVisible ? 1 : 0;
+        const endOp = toVisible ? 1 : 0;
         const t0 = performance.now();
 
         function tick() {
           if (_fadeCancelToken !== token) return;
-          const p  = Math.min((performance.now() - t0) / FADE_MS, 1);
+          const p = Math.min((performance.now() - t0) / FADE_MS, 1);
           const op = startOp + (endOp - startOp) * p;
           for (const m of materials) { m.opacity = op; m.needsUpdate = true; }
           if (p < 1) {
@@ -354,7 +355,7 @@ async function init() {
         item.addEventListener('click', () => {
           const name = item.textContent.trim().toLowerCase();
           const isCredits = name === 'credits';
-          const isAbout   = name === 'about';
+          const isAbout = name === 'about';
           const isFatberg = name === 'fatberg';
 
           creditsOverlay?.classList.toggle('visible', isCredits);
@@ -367,14 +368,18 @@ async function init() {
 
           isDissected = (name === 'dissected');
 
+          const isPerspective = (name === 'recorded' || name === 'remediated');
+          setCameraMode(isPerspective);
+
           enableDissectedTilt(isDissected);
 
           if (name === 'collage') { collage.show(); } else { collage.hide(); }
 
           const isCollage = name === 'collage';
-          controls.mouseButtons.LEFT  = (isCollage || isDissected) ? null : THREE.MOUSE.ROTATE;
+          controls.mouseButtons.LEFT = (isCollage || isDissected) ? null : THREE.MOUSE.ROTATE;
           controls.mouseButtons.RIGHT = isDissected ? null : THREE.MOUSE.PAN;
-          controls.enableZoom         = !isDissected;
+          controls.enableZoom = !(isDissected || isCollage);
+          enableCollagePan(isCollage);
           document.body.classList.toggle('collage-mode', isCollage);
           document.body.classList.toggle('dissected-mode', isDissected);
           document.body.classList.toggle('fatberg-mode', isFatberg);
@@ -431,7 +436,7 @@ async function init() {
       });
     }
 
-    const tickSprites = setupTooltips(camera, scene, tooltipEl, modelBox, () => isDissected);
+    const tickSprites = setupTooltips(getCamera, scene, tooltipEl, modelBox, () => isDissected);
     setTickSprites(tickSprites);
 
     function pulseCtrl(selector) {
@@ -447,7 +452,7 @@ async function init() {
     _canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       if (document.body.classList.contains('collage-mode') ||
-          document.body.classList.contains('dissected-mode')) {
+        document.body.classList.contains('dissected-mode')) {
         pulseCtrl('.ctrl-lmb');
       }
     });
@@ -466,7 +471,7 @@ async function init() {
     // bgColorFrom/bgColorTo: lerp endpoints for the background transition.
     // modeT animates 0→1 from the snapshot color at trigger time to the new target color.
     const bgColorFrom = new THREE.Color(0xeeeeee);
-    const bgColorTo   = new THREE.Color(0xeeeeee);
+    const bgColorTo = new THREE.Color(0xeeeeee);
     let modeT = 1;
     let modeTarget = 1;
     let modelT = 0;
@@ -497,7 +502,7 @@ async function init() {
       setModeProgress(modelT);
       scene.background.lerpColors(bgColorFrom, bgColorTo, modeT);
 
-      const bgSettled    = Math.abs(modeT  - modeTarget)  <= 0.0001;
+      const bgSettled = Math.abs(modeT - modeTarget) <= 0.0001;
       const modelSettled = Math.abs(modelT - modelTarget) <= 0.0001;
       if (!bgSettled || !modelSettled) {
         modeRafId = requestAnimationFrame(tickModeFrame);
@@ -512,7 +517,7 @@ async function init() {
     // bg/darkUI/mdT: background, UI theme, model texture — see MODE_VISUALS above.
     // labelColor/labelOpacity: applied directly to anchored scene text elements.
     _triggerMode = ({ bg, darkUI, mdT: mdT_new, labelColor, labelOpacity }) => {
-      const newBgTo  = new THREE.Color(bg);
+      const newBgTo = new THREE.Color(bg);
       const bgChanged = !bgColorTo.equals(newBgTo);
       const mdChanged = modelTarget !== mdT_new;
       const uiChanged = document.body.classList.contains('dark') !== darkUI;
@@ -529,7 +534,7 @@ async function init() {
       // Double RAF ensures these run after fadeOverlays' single RAF (which sets opacity '1').
       requestAnimationFrame(() => requestAnimationFrame(() => {
         for (const label of sceneLabels) {
-          label.element.style.color   = labelColor;
+          label.element.style.color = labelColor;
           label.element.style.opacity = labelOpacity;
         }
       }));
@@ -543,7 +548,7 @@ async function init() {
     // Apply initial mode visuals immediately on load (click handler never fires for the default mode).
     _triggerMode(MODE_VISUALS[_currentMode]);
 
-    animateIntro(camera, controls, 1750);
+    animateIntro(getCamera(), controls, 1750);
   } catch (err) {
     setProgress(100, "Error – see console");
     console.error("[main] Initialisation failed:", err);
@@ -552,8 +557,8 @@ async function init() {
 }
 
 {
-  const dot   = document.getElementById('subnav-dot');
-  const wrap  = document.querySelector('.subnav-wrap');
+  const dot = document.getElementById('subnav-dot');
+  const wrap = document.querySelector('.subnav-wrap');
   const items = document.querySelectorAll('.subnav-item');
 
   function moveDot(item, animate) {

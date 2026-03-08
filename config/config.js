@@ -1,5 +1,5 @@
 const CONFIG = {
-  modelPath: './models/nyc_topo.glb',
+  modelPath: './models/nyc_topo_compressed.glb',
 
   // Model centroid in GLB metre space — subtracted to bring everything near origin
   originOffset: {
@@ -15,9 +15,9 @@ const CONFIG = {
   feetToMeters: 0.30480061,
 
   csvFiles: {
-    cso:              { path: './data/cso_2263_clipped.csv',   color: 0x00FFFF, darkColor: 0xFF0000, label: 'CSO' },
-    npdes:            { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, darkColor: 0x00FF00, label: 'NPDES' },
-    rcra_2263_clipped:{ path: './data/rcra_2263_clipped.csv',  color: 0x515B28, darkColor: 0xB1C074, label: 'RCRA' }
+    cso: { path: './data/cso_2263_clipped.csv', color: 0x00FFFF, darkColor: 0xFF0000, label: 'CSO' },
+    npdes: { path: './data/npdes_2263_clipped.csv', color: 0xFF3800, darkColor: 0x00FF00, label: 'NPDES' },
+    rcra_2263_clipped: { path: './data/rcra_2263_clipped.csv', color: 0x515B28, darkColor: 0xB1C074, label: 'RCRA' }
   },
 
   marker: {

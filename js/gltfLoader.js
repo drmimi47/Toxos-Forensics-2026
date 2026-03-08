@@ -76,8 +76,15 @@ export async function loadModel(scene, onProgress) {
         }
 
         let topoNode = null;
+        let minVerts = Infinity;
         model.traverse((child) => {
-          if (child.name === 'topography') topoNode = child;
+          if (child.isMesh) {
+            const count = child.geometry.attributes.position.count;
+            if (count > 10000 && count < minVerts) { // Ensure it's not some tiny stray node
+              minVerts = count;
+              topoNode = child;
+            }
+          }
         });
 
         function isTopoMesh(mesh) {
