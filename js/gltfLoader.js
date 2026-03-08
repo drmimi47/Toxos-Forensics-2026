@@ -222,7 +222,7 @@ export async function loadModel(scene, onProgress) {
         };
 
         console.log('[gltfLoader] Model loaded and offset applied.');
-        resolve({ model: wrapper, setModeProgress });
+        resolve({ model: wrapper, setModeProgress, topoMeshes });
       },
       (progress) => {
         if (progress.total && onProgress) {

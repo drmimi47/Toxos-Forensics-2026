@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import CONFIG from "../config/config.js";
 import { createViewer } from "./viewer.js";
 import { loadModel } from "./gltfLoader.js";
 import { loadAllCSV } from "./csvLoader.js";
@@ -6,6 +7,7 @@ import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
 import { closeDetail, getDetailType } from "./detailPanel.js";
 import { addAllLabels, addAllImages } from "./labels.js";
 import { createCollagePlanes } from "./collage.js";
+import { buildTerrainSnapper } from "./terrainSnap.js";
 
 // Per-mode visual settings. Edit these values to retheme each submenu independently.
 // bg:           hex color for the 3D viewport background.
@@ -60,7 +62,7 @@ async function init() {
   try {
     setProgress(10, "Loading 3D model geometry and textures");
 
-    const { model, setModeProgress } = await loadModel(
+    const { model, setModeProgress, topoMeshes } = await loadModel(
       scene,
       (pct) => {
         if (pct < 30) setProgress(10 + pct * 0.2, `Loading model geometry: ${Math.round(pct)}%`);
@@ -87,11 +89,19 @@ async function init() {
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
     const csvResults = await loadAllCSV(scene);
 
+    setProgress(83, "Snapping data points to terrain surface");
+    scene.updateMatrixWorld(true);
+    // Build once — reuse for any future CSV dataset added to config.csvFiles
+    const snapToTerrain = buildTerrainSnapper(topoMeshes);
+    for (const result of Object.values(csvResults)) {
+      snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
+    }
+
     setProgress(85, "Adding anchored labels to scene");
     const sceneLabels = addAllLabels(scene);
 
     setProgress(88, "Adding overlay images to scene");
-    const sceneImages = addAllImages(scene);
+    const sceneImages = addAllImages(scene, getCamera);
 
     setProgress(91, "Creating collage planes");
     const collage = createCollagePlanes(scene, modelBox);
@@ -307,7 +317,7 @@ async function init() {
       const creditsOverlay = document.getElementById('credits-overlay');
       const aboutOverlay = document.getElementById('about-overlay');
 
-      const overlayObjects = [...sceneLabels, ...sceneImages];
+      const overlayObjects = [...sceneLabels]; // sceneImages are now THREE.Mesh — handled separately
       const csvGroups = Object.values(csvResults).map(r => r?.group).filter(Boolean);
 
       let _fadeRafId = null;
@@ -413,10 +423,7 @@ async function init() {
                 label.element.style.opacity = MODE_VISUALS.collage.labelOpacity;
                 label.element.style.display = '';
               }
-              for (const img of sceneImages) {
-                img.element.style.opacity = '0';
-                img.element.style.display = 'none';
-              }
+              for (const img of sceneImages) img.visible = false;
             }));
             return;
           }
@@ -427,7 +434,7 @@ async function init() {
             setZoom(homeZoom * 0.70);
             if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
             requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const img of sceneImages) img.element.style.opacity = '0.5';
+              for (const img of sceneImages) img.visible = true;
               for (const el of _dissEls) el.style.opacity = '1';
             }));
           } else {
@@ -436,7 +443,7 @@ async function init() {
             setZoom(homeZoom);
             for (const el of _dissEls) el.style.opacity = '0';
             requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const img of sceneImages) img.element.style.opacity = '1';
+              for (const img of sceneImages) img.visible = true;
             }));
           }
         });

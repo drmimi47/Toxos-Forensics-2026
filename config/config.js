@@ -21,9 +21,9 @@ const CONFIG = {
   },
 
   marker: {
-    screenSize: 0.008,
+    screenSize: 0.005, // size of point sprites in screen space (independent of zoom)
     worldSize: 80,
-    heightOffset: 125
+    heightOffset: 10 //125 z-height of the data sets
   },
 
   camera: {

@@ -101,17 +101,22 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
     selectedSprite = null;
   }
 
+  // With sizeAttenuation:false, the perspective sprite shader applies
+  // "scale *= depth" before projection, which cancels the perspective divide
+  // and makes the dot occupy screenSize * proj11 * (viewport/2) pixels.
+  // Ortho skips that step, so its world-space scale must be pre-multiplied by
+  // the same proj11/2 factor to produce an equal pixel size.
+  // proj11 = 1/tan(FOV/2) for a 35° perspective camera → factor ≈ 1.586.
+  const _ORTHO_FACTOR = 1 / (2 * Math.tan(17.5 * Math.PI / 180)); // ≈ 1.586
+
   function getBaseSize() {
     const camera = typeof getCamera === 'function' ? getCamera() : getCamera;
     if (camera.isOrthographicCamera) {
       const frustumH = (camera.top - camera.bottom) / (camera.zoom || 1);
-      return CONFIG.marker.screenSize * frustumH;
+      return CONFIG.marker.screenSize * frustumH * _ORTHO_FACTOR;
     }
-    // Calculate the frustum height at the center of the scene
-    const distance = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
-    const vFov = (camera.fov * Math.PI) / 180;
-    const frustumH = 2 * Math.tan(vFov / 2) * distance / (camera.zoom || 1);
-    return CONFIG.marker.screenSize * frustumH;
+    // sizeAttenuation:false — fixed screen-space value, depth-independent.
+    return CONFIG.marker.screenSize;
   }
 
   let _groupCache = null;

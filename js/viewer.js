@@ -110,14 +110,6 @@ export function createViewer() {
   let panelPrevTime = performance.now();
   let _baseHalfH = 0;
 
-  /**
-   * Shift + scale the orthographic frustum so the scene appears centred in
-   * the remaining visible area when the detail panel is open.
-   *
-   * Shift derivation: for the world origin to appear at NDC x = –P/W
-   *   left  = –f + shift,  right = f + shift
-   *   NDC(0) = –(right+left)/(right–left) = –shift/f  →  shift = P·f/W ✓
-   */
   function applyPanelToCamera() {
     const camera = activeCamera;
     if (!camera.isOrthographicCamera && !camera.isPerspectiveCamera) return;

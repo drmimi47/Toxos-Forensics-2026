@@ -98,7 +98,7 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
 
   const material = new THREE.SpriteMaterial({
     map: lightTex,
-    sizeAttenuation: true,
+    sizeAttenuation: false, // constant screen size — shader cancels depth attenuation
     transparent: true,
     depthWrite: false,
     depthTest: false,
@@ -111,7 +111,7 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
   group.name = label;
   group.renderOrder = 999;
 
-  const markerSize = CONFIG.marker.worldSize;
+  const markerSize = CONFIG.marker.screenSize; // screen-space units, matches sizeAttenuation:false
 
   rows.forEach((row) => {
     const x = parseFloat(row.X);
