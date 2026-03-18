@@ -258,7 +258,9 @@ export function createViewer() {
 
   // ── Collage-mode two-finger trackpad pan ──────────────────────────────────
   let _collagePanActive = false;
-  const COLLAGE_PAN_SPEED = 2.43;
+  let _collagePanBounds = null;
+  function setCollagePanBounds(box) { _collagePanBounds = box; }
+  const COLLAGE_PAN_SPEED = 9;
 
   function _onCollagePanWheel(e) {
     if (!_collagePanActive) return;
@@ -266,14 +268,46 @@ export function createViewer() {
     e.preventDefault();
     e.stopImmediatePropagation(); // block OrbitControls zoom & tilt handler
 
-    // ctrlKey = trackpad pinch gesture → zoom
+    // ctrlKey = trackpad pinch gesture → zoom-to-cursor
     if (e.ctrlKey) {
       let delta = e.deltaY;
       if (e.deltaMode === 1) delta *= 20;
       if (e.deltaMode === 2) delta *= 300;
-      const factor = Math.pow(0.98, delta);
-      camera.zoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, camera.zoom * factor));
-      camera.updateProjectionMatrix();
+
+      const oldZoom = camera.zoom;
+      const newZoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, oldZoom * Math.pow(0.99, delta)));
+
+      if (newZoom !== oldZoom) {
+        // Cursor in NDC [-1, 1]
+        const rect = renderer.domElement.getBoundingClientRect();
+        const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Pan so the world point under the cursor stays fixed.
+        // When zoom increases, the cursor point moves away from centre in NDC space.
+        // We pan the camera toward the cursor by the exact world-space amount needed
+        // to pull it back: Δworld = right*ndcX*frustumHalfW*(1/oldZoom - 1/newZoom)
+        const zoomShift = 1 / oldZoom - 1 / newZoom; // positive when zooming in
+        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+        const up    = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+        const pan = new THREE.Vector3()
+          .addScaledVector(right, ndcX * camera.right * zoomShift)
+          .addScaledVector(up,    ndcY * camera.top   * zoomShift);
+
+        camera.position.add(pan);
+        controls.target.add(pan);
+
+        camera.zoom = newZoom;
+        camera.updateProjectionMatrix();
+
+        // Re-apply pan bounds after the position shift.
+        if (_collagePanBounds) {
+          const clamped = controls.target.clone().clamp(_collagePanBounds.min, _collagePanBounds.max);
+          const correction = clamped.sub(controls.target);
+          controls.target.add(correction);
+          camera.position.add(correction);
+        }
+      }
       return;
     }
 
@@ -289,6 +323,14 @@ export function createViewer() {
 
     camera.position.add(panDelta);
     controls.target.add(panDelta);
+
+    // Clamp pan to collage bounds; pull camera back by the same offset.
+    if (_collagePanBounds) {
+      const clamped = controls.target.clone().clamp(_collagePanBounds.min, _collagePanBounds.max);
+      const correction = clamped.sub(controls.target);
+      controls.target.add(correction);
+      camera.position.add(correction);
+    }
   }
   // Register first so it can stopImmediatePropagation on later handlers
   renderer.domElement.addEventListener('wheel', _onCollagePanWheel, { passive: false });
@@ -449,6 +491,10 @@ export function createViewer() {
 
       camera.position.lerpVectors(a.startPos, a.endPos, e);
       camera.quaternion.slerpQuaternions(a.startQuat, a.endQuat, e);
+      if (a.endZoom !== undefined) {
+        camera.zoom = a.startZoom + (a.endZoom - a.startZoom) * e;
+        camera.updateProjectionMatrix();
+      }
 
       if (t >= 1) {
         controls.enabled = true;
@@ -460,6 +506,10 @@ export function createViewer() {
 
         camera.position.copy(a.endPos);
         camera.quaternion.copy(a.endQuat);
+        if (a.endZoom !== undefined) {
+          camera.zoom = a.endZoom;
+          camera.updateProjectionMatrix();
+        }
 
         a.done = true;
         if (a.onComplete) a.onComplete();
@@ -551,7 +601,7 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  function goTopDown() {
+  function goTopDown(targetZoom) {
     const camera = activeCamera;
     if (topDownAnim) topDownAnim.done = true;
     const target = controls.target.clone();
@@ -562,6 +612,8 @@ export function createViewer() {
     topDownAnim = {
       startPos: camera.position.clone(), endPos,
       startQuat: camera.quaternion.clone(), endQuat,
+      startZoom: targetZoom !== undefined ? camera.zoom : undefined,
+      endZoom: targetZoom,
       target,
       t0: performance.now(), duration: 800, done: false
     };
@@ -609,5 +661,5 @@ export function createViewer() {
     if (topDownAnim && !topDownAnim.done) topDownAnim.onComplete = fn;
   }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere };
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds };
 }

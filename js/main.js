@@ -18,7 +18,7 @@ import { buildTerrainSnapper } from "./terrainSnap.js";
 const MODE_VISUALS = {
   recorded: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 },
   remediated: { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
-  fatberg: { bg: '#ffffff', darkUI: false, mdT: 0, labelColor: '#000000', labelOpacity: 0.75 },
+  fatberg: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#000000', labelOpacity: 0.75 },
   collage: { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
   dissected: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.50 },
 };
@@ -51,7 +51,7 @@ async function init() {
 
   // If scene is not yet created, set after createViewer()
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds } = createViewer();
 
   // Set initial background color for the scene
   scene.background = new THREE.Color(initialVisuals.bg);
@@ -84,6 +84,16 @@ async function init() {
     }
     setHomeState(getCamera().position, controls.target);
     const homeZoom = getCamera().zoom;
+
+    {
+      const _sz = new THREE.Vector3();
+      modelBox.getSize(_sz);
+      const _pad = Math.max(_sz.x, _sz.z) * 0.40;
+      setCollagePanBounds(new THREE.Box3(
+        new THREE.Vector3(modelBox.min.x - _pad, modelBox.min.y - 300, modelBox.min.z - _pad),
+        new THREE.Vector3(modelBox.max.x + _pad, modelBox.max.y + 600, modelBox.max.z + _pad),
+      ));
+    }
 
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
     const csvResults = await loadAllCSV(scene);
@@ -328,13 +338,17 @@ async function init() {
         zoomRafId = requestAnimationFrame(tickZoom);
       }
 
-      // Cancel programmatic zoom on manual scroll so tickZoom() never fights OrbitControls.
-      controls.addEventListener('change', () => {
+      function stopZoomTween(syncToCurrent = true) {
         if (zoomRafId) {
           cancelAnimationFrame(zoomRafId);
           zoomRafId = null;
-          zoomTarget = getCamera().zoom;
         }
+        if (syncToCurrent) zoomTarget = getCamera().zoom;
+      }
+
+      // Cancel programmatic zoom on manual scroll so tickZoom() never fights OrbitControls.
+      controls.addEventListener('change', () => {
+        stopZoomTween(true);
       });
 
       const creditsOverlay = document.getElementById('credits-overlay');
@@ -439,9 +453,11 @@ async function init() {
           return;
         }
         if (name === 'collage') {
-          goTopDown();
+          // goTopDown now animates zoom internally; cancel any existing zoom tween
+          // so two independent zoom animations never run at the same time.
+          stopZoomTween(true);
+          goTopDown(homeZoom * 0.4);
           setExplode(explodeGroups.map(() => 0));
-          setZoom(homeZoom * 0.4);
           for (const el of _dissEls) el.style.opacity = '0';
           requestAnimationFrame(() => requestAnimationFrame(() => {
             for (const label of sceneLabels) {
@@ -573,7 +589,8 @@ async function init() {
       const backBtn = document.getElementById('back-btn');
       if (backBtn) {
         backBtn.addEventListener('click', () => {
-          backBtn.classList.add('hidden');
+          // Return to the true initial state (recorded/home view) so
+          // narrative can be restarted from the same first-load position.
           _exitNarrative();
         });
       }
@@ -605,16 +622,9 @@ async function init() {
       setNarrativeScrollHandler((delta) => {
         if (!inNarrative) return false;
 
-        // ── Free mode (end of experience): only backward scroll exits ──
+        // ── Free mode (end of experience): pass scroll to OrbitControls for zoom ──
         if (narrativeFree) {
-          if (delta < 0) {
-            narrativeFree = false;
-            backBtn?.classList.add('hidden');
-            enableDissectedTilt(true);
-            setControlsInteraction(false, false, false);
-            scrollPos = TOTAL_SCROLL; // will decrease with next scroll events
-          }
-          return true;
+          return false;
         }
 
         // ── Scroll-driven tilt ─────────────────────────────────────
@@ -648,7 +658,10 @@ async function init() {
           narrativeFree = true;
           backBtn?.classList.remove('hidden');
           enableDissectedTilt(false);
+          // Enable rotate/pan immediately; delay zoom by 2s so accidental scroll
+          // input at the end of the narrative doesn't instantly zoom the model.
           setControlsInteraction(true, true, false);
+          setTimeout(() => setControlsInteraction(true, true, true), 2000);
         }
 
         return true;
