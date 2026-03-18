@@ -51,7 +51,7 @@ async function init() {
 
   // If scene is not yet created, set after createViewer()
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere } = createViewer();
 
   // Set initial background color for the scene
   scene.background = new THREE.Color(initialVisuals.bg);
@@ -76,14 +76,13 @@ async function init() {
 
     const modelBox = new THREE.Box3().setFromObject(model);
     frameBoundingBox(model, getCamera(), controls);
-    setHomeState(getCamera().position, controls.target);
-    // Shift perspective target down for recorded/remediated initial view only.
-    // Done AFTER setHomeState so dissected/fatberg homeState is unaffected.
-    if (getCamera().isPerspectiveCamera) {
-      const _d = getCamera().position.distanceTo(controls.target);
-      controls.target.y -= _d * 0.08;
-      controls.update();
+    {
+      const _box = new THREE.Box3().setFromObject(model);
+      const _sphere = new THREE.Sphere();
+      _box.getBoundingSphere(_sphere);
+      setModelSphere(_sphere.radius, CONFIG.camera.initialZoom ?? 0.80);
     }
+    setHomeState(getCamera().position, controls.target);
     const homeZoom = getCamera().zoom;
 
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
@@ -226,7 +225,7 @@ async function init() {
         }
       });
 
-      return [{ sprite, svgLine, svgDot, nameEl, side }];
+      return [{ sprite, svgLine, svgDot, nameEl, side, panel, dataGroup: result.group }];
     });
 
     let _dissLineRafId = null;
@@ -258,6 +257,30 @@ async function init() {
         csvResults.npdes?.group,
         csvResults.rcra_2263_clipped?.group,
       ].filter(Boolean).sort((a, b) => b.children.length - a.children.length);
+
+      // Fixed CSO → NPDES → RCRA order for the sequential reveal in phase 0.
+      const orderedGroups = [
+        csvResults.cso?.group,
+        csvResults.npdes?.group,
+        csvResults.rcra_2263_clipped?.group,
+      ].filter(Boolean);
+
+      let _currentSubPhase = -1;
+
+      function _applyDissectedSubPhase(idx) {
+        if (idx === _currentSubPhase) return;
+        _currentSubPhase = idx;
+        // Show only the active dataset group; hide the others.
+        orderedGroups.forEach((g, i) => { if (g) g.visible = (i === idx); });
+        // Sync SVG annotation lines + dots and the side panels.
+        for (const ann of _annData) {
+          const active = ann.dataGroup === orderedGroups[idx];
+          ann.svgLine.setAttribute('stroke-opacity', active ? '0.7' : '0');
+          ann.svgDot.setAttribute('opacity', active ? '1' : '0');
+          ann.panel.style.opacity = active ? '1' : '0';
+          ann.panel.style.pointerEvents = active ? '' : 'none';
+        }
+      }
 
       const targetY = explodeGroups.map(() => 0);
       let rafId = null;
@@ -368,85 +391,267 @@ async function init() {
         _fadeRafId = requestAnimationFrame(tick);
       }
 
+      // ── Core mode switch (used by nav and narrative) ───────────
+      function _doSwitchMode(name, force = false) {
+        if (name === 'map') name = 'recorded'; // "Map" nav item = recorded/home mode
+        const isCredits = name === 'credits';
+        const isAbout = name === 'about';
+        const isFatberg = name === 'fatberg';
+
+        creditsOverlay?.classList.toggle('visible', isCredits);
+        aboutOverlay?.classList.toggle('visible', isAbout);
+
+        if (isCredits || isAbout) return;
+
+        if (!force && name === _currentMode) return;
+        _currentMode = name;
+
+        isDissected = (name === 'dissected');
+
+        setCameraMode(false); // always orthographic
+
+        enableDissectedTilt(isDissected);
+
+        if (name === 'collage') { collage.show(); } else { collage.hide(); }
+
+        const isCollage = name === 'collage';
+        controls.mouseButtons.LEFT = (isCollage || isDissected) ? null : THREE.MOUSE.ROTATE;
+        controls.mouseButtons.RIGHT = isDissected ? null : THREE.MOUSE.PAN;
+        controls.enableZoom = !(isDissected || isCollage);
+        enableCollagePan(isCollage);
+        document.body.classList.toggle('collage-mode', isCollage);
+        document.body.classList.toggle('dissected-mode', isDissected);
+        document.body.classList.toggle('fatberg-mode', isFatberg);
+
+        document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
+
+        const hideOverlays = isFatberg || isCollage;
+        fadeOverlays(!hideOverlays);
+
+        const visuals = MODE_VISUALS[name];
+        if (visuals) _triggerMode?.(visuals);
+
+        if (isFatberg) {
+          goFatbergView();
+          setZoom(homeZoom);
+          setExplode(explodeGroups.map(() => 0));
+          for (const el of _dissEls) el.style.opacity = '0';
+          return;
+        }
+        if (name === 'collage') {
+          goTopDown();
+          setExplode(explodeGroups.map(() => 0));
+          setZoom(homeZoom * 0.4);
+          for (const el of _dissEls) el.style.opacity = '0';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            for (const label of sceneLabels) {
+              label.element.style.opacity = MODE_VISUALS.collage.labelOpacity;
+              label.element.style.display = '';
+            }
+            for (const img of sceneImages) img.visible = false;
+          }));
+          return;
+        }
+
+        if (name === 'dissected') {
+          goDissectedView();
+          setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
+          setZoom(homeZoom * 0.70);
+          if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            for (const img of sceneImages) img.visible = true;
+            for (const el of _dissEls) el.style.opacity = '1';
+          }));
+        } else {
+          if (name === 'recorded' || name === 'remediated') goHome();
+          setExplode(explodeGroups.map(() => 0));
+          setZoom(homeZoom);
+          for (const el of _dissEls) el.style.opacity = '0';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            for (const img of sceneImages) img.visible = true;
+          }));
+        }
+      }
+
+      // ── Nav click handler ───────────────────────────────────────
       document.querySelectorAll('.subnav-item').forEach(item => {
         item.addEventListener('click', () => {
           const name = item.textContent.trim().toLowerCase();
-          const isCredits = name === 'credits';
-          const isAbout = name === 'about';
-          const isFatberg = name === 'fatberg';
-
-          creditsOverlay?.classList.toggle('visible', isCredits);
-          aboutOverlay?.classList.toggle('visible', isAbout);
-
-          if (isCredits || isAbout) return;
-
-          if (name === _currentMode) return;
-          _currentMode = name;
-
-          isDissected = (name === 'dissected');
-
-          const isPerspective = (name === 'recorded' || name === 'remediated');
-          setCameraMode(isPerspective);
-
-          enableDissectedTilt(isDissected);
-
-          if (name === 'collage') { collage.show(); } else { collage.hide(); }
-
-          const isCollage = name === 'collage';
-          controls.mouseButtons.LEFT = (isCollage || isDissected) ? null : THREE.MOUSE.ROTATE;
-          controls.mouseButtons.RIGHT = isDissected ? null : THREE.MOUSE.PAN;
-          controls.enableZoom = !(isDissected || isCollage);
-          enableCollagePan(isCollage);
-          document.body.classList.toggle('collage-mode', isCollage);
-          document.body.classList.toggle('dissected-mode', isDissected);
-          document.body.classList.toggle('fatberg-mode', isFatberg);
-
-          document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
-
-          // Fade overlays (data points/images) away in both FATBERG and COLLAGE
-          const hideOverlays = isFatberg || isCollage;
-          fadeOverlays(!hideOverlays);
-
-          const visuals = MODE_VISUALS[name];
-          if (visuals) _triggerMode?.(visuals);
-
-          if (isFatberg) { goFatbergView(); setZoom(homeZoom); for (const el of _dissEls) el.style.opacity = '0'; return; }
-          // lower the 0.x multiplier to zoom out more in collage
-          if (name === 'collage') {
-            goTopDown();
-            setExplode(explodeGroups.map(() => 0));
-            setZoom(homeZoom * 0.4);
-            for (const el of _dissEls) el.style.opacity = '0';
-            // Ensure only anchored text (sceneLabels) is visible in COLLAGE, with correct opacity
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const label of sceneLabels) {
-                label.element.style.opacity = MODE_VISUALS.collage.labelOpacity;
-                label.element.style.display = '';
-              }
-              for (const img of sceneImages) img.visible = false;
-            }));
-            return;
-          }
-
-          if (name === 'dissected') {
-            goDissectedView();
-            setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
-            setZoom(homeZoom * 0.70);
-            if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const img of sceneImages) img.visible = true;
-              for (const el of _dissEls) el.style.opacity = '1';
-            }));
-          } else {
-            if (name === 'recorded' || name === 'remediated') goHome();
-            setExplode(explodeGroups.map(() => 0));
-            setZoom(homeZoom);
-            for (const el of _dissEls) el.style.opacity = '0';
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-              for (const img of sceneImages) img.visible = true;
-            }));
-          }
+          _doSwitchMode(name);
         });
+      });
+
+      // ── Continuous scroll-driven narrative ──────────────────────
+      // The full experience is one scroll axis: 0 → TOTAL_SCROLL.
+      // Camera theta is a direct linear map of that position.
+      // Visual/content changes happen at exactly 1/3 and 2/3.
+
+      const SCROLL_PER_PHASE = 1500; // scroll units per section
+      const TOTAL_SCROLL = SCROLL_PER_PHASE * 3;
+      const EXIT_BACK_THRESH = 400; // how far past 0 before exiting to recorded
+
+      let inNarrative = false;
+      let narrativeFree = false; // at TOTAL_SCROLL: free rotate/pan, scroll locked
+      let scrollPos = 0;
+      let currentPhase = -1;
+
+      function _applyPhase(phase) {
+        if (phase === currentPhase) return;
+        currentPhase = phase;
+        document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
+
+        if (phase === 0) {
+          isDissected = true;
+          _currentMode = 'dissected';
+          document.body.classList.remove('fatberg-mode', 'collage-mode');
+          document.body.classList.add('dissected-mode');
+          fadeOverlays(true);
+          if (_triggerMode) _triggerMode(MODE_VISUALS.dissected);
+          setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
+          _currentSubPhase = -1; // force sub-phase re-apply on next scroll tick
+          if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            for (const img of sceneImages) img.visible = true;
+            for (const el of _dissEls) el.style.opacity = '1';
+          }));
+        } else if (phase === 1) {
+          isDissected = false;
+          _currentMode = 'fatberg';
+          document.body.classList.remove('dissected-mode', 'collage-mode');
+          document.body.classList.add('fatberg-mode');
+          fadeOverlays(false);
+          if (_triggerMode) _triggerMode(MODE_VISUALS.fatberg);
+          setExplode(explodeGroups.map(() => 0));
+          for (const el of _dissEls) el.style.opacity = '0';
+        } else if (phase === 2) {
+          isDissected = false;
+          _currentMode = 'remediated';
+          document.body.classList.remove('dissected-mode', 'fatberg-mode', 'collage-mode');
+          fadeOverlays(true);
+          if (_triggerMode) _triggerMode(MODE_VISUALS.remediated);
+          setExplode(explodeGroups.map(() => 0));
+          for (const el of _dissEls) el.style.opacity = '0';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            for (const img of sceneImages) img.visible = true;
+          }));
+        }
+      }
+
+      function _exitNarrative() {
+        inNarrative = false;
+        narrativeFree = false;
+        scrollPos = 0;
+        currentPhase = -1;
+        _currentSubPhase = -1;
+        backBtn?.classList.add('hidden');
+        // Restore all dataset groups and annotation panels to full visibility.
+        orderedGroups.forEach(g => { if (g) g.visible = true; });
+        for (const ann of _annData) {
+          ann.panel.style.opacity = '';
+          ann.panel.style.pointerEvents = '';
+        }
+        enableDissectedTilt(false);
+        isDissected = false;
+        _currentMode = 'recorded';
+        document.body.classList.remove('collage-mode', 'dissected-mode', 'fatberg-mode');
+        fadeOverlays(true);
+        if (_triggerMode) _triggerMode(MODE_VISUALS.recorded);
+        goHome();
+        setExplode(explodeGroups.map(() => 0));
+        setZoom(homeZoom);
+        setControlsInteraction(false, false, false); // locked during return animation
+        for (const el of _dissEls) el.style.opacity = '0';
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          for (const img of sceneImages) img.visible = true;
+        }));
+        setAnimOnComplete(() => {
+          setControlsInteraction(true, true, true);
+          startBtn?.classList.remove('hidden');
+        });
+      }
+
+      const backBtn = document.getElementById('back-btn');
+      if (backBtn) {
+        backBtn.addEventListener('click', () => {
+          backBtn.classList.add('hidden');
+          _exitNarrative();
+        });
+      }
+
+      const startBtn = document.getElementById('start-btn');
+      if (startBtn) {
+        startBtn.addEventListener('click', () => {
+          startBtn.classList.add('hidden');
+          inNarrative = true;
+          narrativeFree = false;
+          scrollPos = 0;
+          currentPhase = -1;
+
+          collage.hide();
+          enableCollagePan(false);
+          setControlsInteraction(false, false, false);
+
+          // Apply phase 0 visuals immediately, starting with CSO only.
+          _applyPhase(0);
+          _applyDissectedSubPhase(0);
+          setZoom(homeZoom);
+
+          // Animate to near-top-down; tilt drives the camera from here
+          goDissectedTopDown();
+          setAnimOnComplete(() => { enableDissectedTilt(true); });
+        });
+      }
+
+      setNarrativeScrollHandler((delta) => {
+        if (!inNarrative) return false;
+
+        // ── Free mode (end of experience): only backward scroll exits ──
+        if (narrativeFree) {
+          if (delta < 0) {
+            narrativeFree = false;
+            backBtn?.classList.add('hidden');
+            enableDissectedTilt(true);
+            setControlsInteraction(false, false, false);
+            scrollPos = TOTAL_SCROLL; // will decrease with next scroll events
+          }
+          return true;
+        }
+
+        // ── Scroll-driven tilt ─────────────────────────────────────
+        scrollPos += delta;
+
+        // Backward past start → exit narrative
+        if (scrollPos < -EXIT_BACK_THRESH) {
+          _exitNarrative();
+          return true;
+        }
+
+        // Clamp for theta / phase computation
+        const pos = Math.max(0, Math.min(TOTAL_SCROLL, scrollPos));
+
+        // Map scroll position linearly to camera tilt angle
+        const { min: tMin, max: tMax } = getTiltInfo();
+        setTiltTarget(tMin + (tMax - tMin) * (pos / TOTAL_SCROLL));
+
+        // Content phase: 0 = dissected, 1 = fatberg, 2 = remediated
+        const phase = pos >= TOTAL_SCROLL ? 2 : Math.floor(pos / SCROLL_PER_PHASE);
+        _applyPhase(phase);
+
+        // Within phase 0: reveal CSO → NPDES → RCRA one at a time.
+        if (phase === 0) {
+          const subIdx = Math.min(2, Math.floor(pos / (SCROLL_PER_PHASE / 3)));
+          _applyDissectedSubPhase(subIdx);
+        }
+
+        // Reached the end → enter free rotate/pan mode
+        if (delta > 0 && scrollPos >= TOTAL_SCROLL) {
+          narrativeFree = true;
+          backBtn?.classList.remove('hidden');
+          enableDissectedTilt(false);
+          setControlsInteraction(true, true, false);
+        }
+
+        return true;
       });
     }
 
@@ -573,7 +778,7 @@ async function init() {
 {
   const dot = document.getElementById('subnav-dot');
   const wrap = document.querySelector('.subnav-wrap');
-  const items = document.querySelectorAll('.subnav-item');
+  const items = document.querySelectorAll('#subnav .subnav-item');
 
   function moveDot(item, animate) {
     const wrapRect = wrap.getBoundingClientRect();

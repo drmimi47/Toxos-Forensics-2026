@@ -57,7 +57,7 @@ export function createViewer() {
   perspCamera.position.set(isoXZ, isoY, isoXZ);
   perspCamera.lookAt(0, 0, 0);
 
-  let activeCamera = perspCamera; // recorded mode starts in perspective
+  let activeCamera = orthoCamera; // always orthographic
 
   function setCameraMode(isPerspective) {
     const nextCamera = isPerspective ? perspCamera : orthoCamera;
@@ -110,6 +110,26 @@ export function createViewer() {
   let panelPrevTime = performance.now();
   let _baseHalfH = 0;
 
+  // Stored after frameBoundingBox so resize can recompute the correct frustum
+  // for any aspect ratio (portrait vs landscape) using the bounding sphere.
+  let _sphereRadius = 0;
+  let _spherePad = 0.80;
+
+  function _baseHalfHFromSphere(w, h) {
+    if (!_sphereRadius) return 0;
+    const a = w / h;
+    return Math.max(_sphereRadius / _spherePad, _sphereRadius / (_spherePad * a));
+  }
+
+  function setModelSphere(radius, pad) {
+    _sphereRadius = radius;
+    _spherePad = pad;
+    // Seed _baseHalfH immediately so applyPanelToCamera uses the right base.
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w && h) _baseHalfH = _baseHalfHFromSphere(w, h);
+  }
+
   function applyPanelToCamera() {
     const camera = activeCamera;
     if (!camera.isOrthographicCamera && !camera.isPerspectiveCamera) return;
@@ -159,6 +179,10 @@ export function createViewer() {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (w === 0 || h === 0) return;
+    // Recompute base frustum height for the new aspect ratio so the model
+    // always fits in both dimensions regardless of portrait/landscape changes.
+    const newBase = _baseHalfHFromSphere(w, h);
+    if (newBase > 0) _baseHalfH = newBase;
     applyPanelToCamera();
     pendingW = w;
     pendingH = h;
@@ -266,7 +290,7 @@ export function createViewer() {
     camera.position.add(panDelta);
     controls.target.add(panDelta);
   }
-  // Register BEFORE tilt & OrbitControls so it can stopImmediatePropagation
+  // Register first so it can stopImmediatePropagation on later handlers
   renderer.domElement.addEventListener('wheel', _onCollagePanWheel, { passive: false });
 
   // ── Collage-mode pinch-to-zoom (touch only) ───────────────────────────────
@@ -301,6 +325,38 @@ export function createViewer() {
 
   function enableCollagePan(enable) { _collagePanActive = enable; }
 
+  // ── Narrative scroll handler (runs after collage, before tilt) ──
+  let _narrativeScrollHandler = null;
+
+  function _onNarrativeWheel(e) {
+    if (!_narrativeScrollHandler) return;
+    let delta = e.deltaY;
+    if (e.deltaMode === 1) delta *= 20;
+    if (e.deltaMode === 2) delta *= 600;
+    const shouldBlock = _narrativeScrollHandler(delta);
+    if (shouldBlock) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+  renderer.domElement.addEventListener('wheel', _onNarrativeWheel, { passive: false });
+
+  function setNarrativeScrollHandler(fn) { _narrativeScrollHandler = fn; }
+
+  function setTiltTarget(theta) {
+    _tiltTargetTheta = THREE.MathUtils.clamp(theta, TILT_THETA_MIN, TILT_THETA_MAX);
+  }
+
+  function getTiltInfo() {
+    return { current: _tiltCurrentTheta, target: _tiltTargetTheta, min: TILT_THETA_MIN, max: TILT_THETA_MAX };
+  }
+
+  function setControlsInteraction(rotate, pan, zoom) {
+    controls.mouseButtons.LEFT = rotate ? THREE.MOUSE.ROTATE : null;
+    controls.mouseButtons.RIGHT = pan ? THREE.MOUSE.PAN : null;
+    controls.enableZoom = zoom;
+  }
+
   // ── Dissected-mode tilt ───────────────────────────────────────────────────
   let _tiltActive = false;
   let _tiltNeedsSnapshot = false;
@@ -310,7 +366,7 @@ export function createViewer() {
   let _tiltR = 0;
 
   const TILT_THETA_MIN = 0.05;
-  const TILT_THETA_MAX = 1.45;
+  const TILT_THETA_MAX = 1.40; // ~80° — steep oblique by the end of the narrative
   const TILT_SPEED = 0.0007;
   const TILT_LERP = 0.10;
 
@@ -406,6 +462,7 @@ export function createViewer() {
         camera.quaternion.copy(a.endQuat);
 
         a.done = true;
+        if (a.onComplete) a.onComplete();
       }
     } else {
       if (_tiltActive && _tiltNeedsSnapshot) {
@@ -438,11 +495,6 @@ export function createViewer() {
     if (topDownAnim) topDownAnim.done = true;
     const endPos = homeState.pos.clone();
     const homeTarget = homeState.target.clone();
-    // Perspective (recorded/remediated): shift target down so model sits higher on screen.
-    if (camera.isPerspectiveCamera) {
-      const dist = endPos.distanceTo(homeTarget);
-      homeTarget.y -= dist * 0.08;
-    }
     const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, homeTarget, new THREE.Vector3(0, 1, 0));
     const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
     topDownAnim = {
@@ -516,5 +568,46 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan };
+  // Animate to a near-top-down position aligned with the home horizontal direction,
+  // so the tilt system's phi matches the isometric axis and the scroll-driven tilt
+  // flows continuously from top-down toward the home camera angle.
+  function goDissectedTopDown() {
+    const camera = activeCamera;
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+
+    const target = homeState.target.clone();
+    const dist = homeState.pos.distanceTo(target);
+
+    // Derive the horizontal direction (phi) from the home position so tilting
+    // tracks the same azimuth as the recorded / remediated views.
+    const phi = Math.atan2(
+      homeState.pos.x - target.x,
+      homeState.pos.z - target.z
+    );
+
+    // Place camera at TILT_THETA_MIN elevation in that direction — nearly top-down
+    // but well-defined so lookAt won't hit a gimbal singularity.
+    const endPos = new THREE.Vector3(
+      target.x + dist * Math.sin(TILT_THETA_MIN) * Math.sin(phi),
+      target.y + dist * Math.cos(TILT_THETA_MIN),
+      target.z + dist * Math.sin(TILT_THETA_MIN) * Math.cos(phi)
+    );
+
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 1, 0));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: camera.position.clone(), endPos,
+      startQuat: camera.quaternion.clone(), endQuat,
+      target,
+      t0: performance.now(), duration: 1200, done: false
+    };
+    controls.enabled = false;
+  }
+
+  function setAnimOnComplete(fn) {
+    if (topDownAnim && !topDownAnim.done) topDownAnim.onComplete = fn;
+  }
+
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere };
 }

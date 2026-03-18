@@ -1041,6 +1041,39 @@ body {
   opacity: 1;
 }
 
+/* ── Narrative START button ─────────────────────────────────── */
+.start-btn {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: transparent;
+  border: 1px solid #ffffff;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 9px 28px;
+  cursor: pointer;
+  pointer-events: all;
+  mix-blend-mode: difference;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px);
+}
+
+.start-btn:hover {
+  opacity: 0.6;
+}
+
+.start-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(12px);
+}
+
 @media screen and (max-width: 640px) {
   .site-header {
     padding: 6px 16px;

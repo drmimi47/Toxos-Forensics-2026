@@ -43,16 +43,13 @@
     <a href="javascript:location.reload()" class="brand-mark">TOXOS<span class="brand-sub">lab</span></a>
     <div class="subnav-wrap">
       <nav id="subnav" class="subnav">
+        <a class="subnav-item active" href="#">Map</a>
         <a class="subnav-item" href="#">About</a>
-        <a class="subnav-item" href="#">Collage</a>
-        <a class="subnav-item" href="#">Fatberg</a>
-        <a class="subnav-item active" href="#">Recorded</a>
-        <a class="subnav-item" href="#">Remediated</a>
-        <a class="subnav-item" href="#">Dissected</a>
         <a class="subnav-item" href="#">Credits</a>
       </nav>
       <span id="subnav-dot" class="subnav-dot"></span>
     </div>
+    <a id="collage-nav" class="subnav-item" href="#">Collage</a>
   </header>
 
   <!-- Legend overlay -->
@@ -181,6 +178,10 @@
       if (el) el.textContent = `Last Updated ${mon} ${day} ${hh}:${mm}`;
     }).catch(() => { });
   </script>
+
+  <!-- Narrative START / BACK buttons -->
+  <button id="start-btn" class="start-btn">Start</button>
+  <button id="back-btn" class="start-btn hidden">Back</button>
 
   <!-- Entry point -->
   <script type="module" src="./js/main.js"></script>

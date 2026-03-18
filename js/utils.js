@@ -421,13 +421,27 @@ export function frameBoundingBox(object, camera, controls) {
   if (camera.isOrthographicCamera) {
     const dir = camera.position.clone().sub(controls.target).normalize();
     camera.position.copy(center).addScaledVector(dir, 10000);
-    const zoomPad = CONFIG.camera.initialZoom ?? 0.7;
-    const maxDim = Math.max(size.x, size.y, size.z) * zoomPad;
+
+    // Use the bounding sphere radius for frustum sizing.
+    // An orthographic camera projects a sphere as a circle of equal radius
+    // regardless of viewing angle, so this guarantees the model is always
+    // fully in view during any camera tilt or rotation.
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
+    const halfExt = sphere.radius;
+
+    // pad = fraction of the viewport the model should fill (0–1).
+    const pad = CONFIG.camera.initialZoom ?? 0.80;
     const aspect = (camera.right - camera.left) / (camera.top - camera.bottom);
-    camera.top = maxDim;
-    camera.bottom = -maxDim;
-    camera.left = -maxDim * aspect;
-    camera.right = maxDim * aspect;
+
+    // Use the binding axis (height or width) so the model fits in both dimensions.
+    const halfH = Math.max(halfExt / pad, halfExt / (pad * aspect));
+    const halfW = halfH * aspect;
+
+    camera.top = halfH;
+    camera.bottom = -halfH;
+    camera.left = -halfW;
+    camera.right = halfW;
     camera.updateProjectionMatrix();
   } else {
     // True isometric angle: 45° azimuth, arctan(1/√2) ≈ 35.26° elevation.

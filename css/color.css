@@ -65,6 +65,14 @@ body.dark {
   --rcra-color:  #b1c074;
 }
 
+/* Dissected mode uses light-mode sprite textures (mdT=0) even on a dark
+   background, so annotation colors must stay on the light-mode values. */
+body.dissected-mode {
+  --cso-color:   #00ffff;
+  --npdes-color: #ff3800;
+  --rcra-color:  #515b28;
+}
+
 body.dark .footer-controls .key {
   background: rgba(255, 255, 255, 0.1);
   transition: background 0.5s ease;

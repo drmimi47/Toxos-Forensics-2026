@@ -31,7 +31,7 @@ const CONFIG = {
     near: 1,
     far: 50000,
     orthoSize: 3000,
-    initialZoom: 0.45,
+    initialZoom: 0.80,
     position: { x: 0, y: 2500, z: 4000 }
   },
 
