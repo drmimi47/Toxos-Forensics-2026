@@ -85,6 +85,11 @@ async function init() {
     setHomeState(getCamera().position, controls.target);
     const homeZoom = getCamera().zoom;
 
+    // Capture the polar angle of the default load-in camera position.
+    // Used to seed the inverted scroll-to-tilt mapping in the Start sequence.
+    const _homeOffset = getCamera().position.clone().sub(controls.target);
+    const homeTheta = Math.acos(THREE.MathUtils.clamp(_homeOffset.y / _homeOffset.length(), -1, 1));
+
     {
       const _sz = new THREE.Vector3();
       modelBox.getSize(_sz);
@@ -493,6 +498,14 @@ async function init() {
       document.querySelectorAll('.subnav-item').forEach(item => {
         item.addEventListener('click', () => {
           const name = item.textContent.trim().toLowerCase();
+          const isMapMenu = name === 'map';
+
+          if (!isMapMenu) {
+            startBtn?.classList.add('hidden');
+          } else if (!inNarrative) {
+            startBtn?.classList.remove('hidden');
+          }
+
           _doSwitchMode(name);
         });
       });
@@ -503,7 +516,7 @@ async function init() {
       // Visual/content changes happen at exactly 1/3 and 2/3.
 
       const SCROLL_PER_PHASE = 1500; // scroll units per section
-      const TOTAL_SCROLL = SCROLL_PER_PHASE * 3;
+      const TOTAL_SCROLL = SCROLL_PER_PHASE * 4;
       const EXIT_BACK_THRESH = 400; // how far past 0 before exiting to recorded
 
       let inNarrative = false;
@@ -517,6 +530,23 @@ async function init() {
         document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
 
         if (phase === 0) {
+          // All datasets visible and exploded — pure data demonstration, no annotation text
+          isDissected = true;
+          _currentMode = 'dissected';
+          document.body.classList.remove('fatberg-mode', 'collage-mode');
+          document.body.classList.add('dissected-mode');
+          fadeOverlays(true);
+          if (_triggerMode) _triggerMode(MODE_VISUALS.dissected);
+          orderedGroups.forEach(g => { if (g) g.visible = true; });
+          setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
+          _currentSubPhase = -1;
+          if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            for (const img of sceneImages) img.visible = true;
+            for (const el of _dissEls) el.style.opacity = '0';
+          }));
+        } else if (phase === 1) {
+          // Dissected sequential reveal: CSO → NPDES → RCRA with annotation panels
           isDissected = true;
           _currentMode = 'dissected';
           document.body.classList.remove('fatberg-mode', 'collage-mode');
@@ -524,13 +554,13 @@ async function init() {
           fadeOverlays(true);
           if (_triggerMode) _triggerMode(MODE_VISUALS.dissected);
           setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
-          _currentSubPhase = -1; // force sub-phase re-apply on next scroll tick
+          _currentSubPhase = -1;
           if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
           requestAnimationFrame(() => requestAnimationFrame(() => {
             for (const img of sceneImages) img.visible = true;
             for (const el of _dissEls) el.style.opacity = '1';
           }));
-        } else if (phase === 1) {
+        } else if (phase === 2) {
           isDissected = false;
           _currentMode = 'fatberg';
           document.body.classList.remove('dissected-mode', 'collage-mode');
@@ -539,7 +569,7 @@ async function init() {
           if (_triggerMode) _triggerMode(MODE_VISUALS.fatberg);
           setExplode(explodeGroups.map(() => 0));
           for (const el of _dissEls) el.style.opacity = '0';
-        } else if (phase === 2) {
+        } else if (phase === 3) {
           isDissected = false;
           _currentMode = 'remediated';
           document.body.classList.remove('dissected-mode', 'fatberg-mode', 'collage-mode');
@@ -608,13 +638,12 @@ async function init() {
           enableCollagePan(false);
           setControlsInteraction(false, false, false);
 
-          // Apply phase 0 visuals immediately, starting with CSO only.
+          // Apply phase 0: all datasets exploded, no annotation text.
           _applyPhase(0);
-          _applyDissectedSubPhase(0);
           setZoom(homeZoom);
 
-          // Animate to near-top-down; tilt drives the camera from here
-          goDissectedTopDown();
+          // Reset to default load-in rotation; tilt drives from there toward top-down
+          goHome();
           setAnimOnComplete(() => { enableDissectedTilt(true); });
         });
       }
@@ -639,17 +668,18 @@ async function init() {
         // Clamp for theta / phase computation
         const pos = Math.max(0, Math.min(TOTAL_SCROLL, scrollPos));
 
-        // Map scroll position linearly to camera tilt angle
-        const { min: tMin, max: tMax } = getTiltInfo();
-        setTiltTarget(tMin + (tMax - tMin) * (pos / TOTAL_SCROLL));
+        // Map scroll position linearly from default angle → top-down
+        const { min: tMin } = getTiltInfo();
+        setTiltTarget(homeTheta + (tMin - homeTheta) * (pos / TOTAL_SCROLL));
 
-        // Content phase: 0 = dissected, 1 = fatberg, 2 = remediated
-        const phase = pos >= TOTAL_SCROLL ? 2 : Math.floor(pos / SCROLL_PER_PHASE);
+        // Content phase: 0 = all data demo, 1 = dissected, 2 = fatberg, 3 = remediated
+        const phase = pos >= TOTAL_SCROLL ? 3 : Math.floor(pos / SCROLL_PER_PHASE);
         _applyPhase(phase);
 
-        // Within phase 0: reveal CSO → NPDES → RCRA one at a time.
-        if (phase === 0) {
-          const subIdx = Math.min(2, Math.floor(pos / (SCROLL_PER_PHASE / 3)));
+        // Within phase 1: reveal CSO → NPDES → RCRA one at a time.
+        if (phase === 1) {
+          const posInPhase = pos - SCROLL_PER_PHASE;
+          const subIdx = Math.min(2, Math.floor(posInPhase / (SCROLL_PER_PHASE / 3)));
           _applyDissectedSubPhase(subIdx);
         }
 

@@ -274,28 +274,6 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
         animating.add(hoveredSprite);
       }
 
-      let imgSrc = '';
-      if (/rcra/i.test(d.type) || /rcra/i.test(hit.object.parent?.name)) {
-        imgSrc = './assets/images/rcra.jpg';
-      } else if (/cso/i.test(d.type)) {
-        imgSrc = './assets/images/cso.jpg';
-      } else if (/npdes/i.test(d.type)) {
-        imgSrc = './assets/images/npdes.jpg';
-      }
-
-      tooltipEl.innerHTML = [
-        `<strong>${d.type}</strong>`,
-        imgSrc ? `<img class="tip-img" src="${imgSrc}" alt="${d.type}">` : '',
-        d.handle ? `<span class="tip-label">Handle</span> <span class="tip-value">${d.handle}</span>` : '',
-        d.text ? `<span class="tip-label">ID</span> <span class="tip-value">${d.text}</span>` : '',
-        `<span class="tip-label">Easting</span> <span class="tip-value">${d.coordX?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>`,
-        `<span class="tip-label">Northing</span> <span class="tip-value">${d.coordY?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>`
-      ].filter(Boolean).join('<br>');
-
-      tooltipEl.style.left = `${event.clientX + 14}px`;
-      tooltipEl.style.top = `${event.clientY + 14}px`;
-      tooltipEl.classList.remove('hidden');
-
       if (modelBox && getDissected?.()) {
         const wp = new THREE.Vector3();
         hit.object.getWorldPosition(wp);

@@ -35,7 +35,7 @@
   --accent-dim:       #4d5c04;                  /* muted accent (scrollbar thumb) */
   --accent-glow:      rgba(102, 123, 5, 0.25);  /* glow behind accent elements */
   --bg-dark:          #eeeeee;                  /* 3D viewport and page background */
-  --bg-panel:         rgba(255, 255, 255, 0.8); /* frosted-glass panels and overlays */
+  --bg-panel:         rgba(255, 255, 255, 0.94); /* frosted-glass panels and overlays */
   --bg-panel-solid:   #ffffff;                  /* solid fallback for panels (mobile footer) */
   --border:           rgba(4, 22, 118, 0.1);    /* subtle borders */
   --border-bright:    rgba(4, 22, 118, 0.18);   /* prominent borders (tooltip, panel edge) */
@@ -50,7 +50,7 @@
 
 body.dark {
   --bg-dark:          #0c0c0c;
-  --bg-panel:         rgba(30, 30, 30, 0.8);
+  --bg-panel:         rgba(22, 22, 22, 0.96);
   --bg-panel-solid:   #111111;
   --border:           rgba(255, 255, 255, 0.08);
   --border-bright:    rgba(255, 255, 255, 0.15);

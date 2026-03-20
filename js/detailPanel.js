@@ -62,6 +62,11 @@ let openOrderCounter = 0;
 
 const STACK_OFFSET = 28;
 
+function _panelStartTop() {
+  // Place panels in the bottom-right quadrant, clearing the header above.
+  return Math.round(window.innerHeight * 0.55);
+}
+
 class PanelInstance {
   constructor(key) {
     this.key           = key;
@@ -74,27 +79,33 @@ class PanelInstance {
     this.el = document.createElement('div');
     this.el.className = 'detail-panel hidden';
     this.el.setAttribute('aria-hidden', 'true');
-    this.el.style.top    = '12px';
+    this.el.style.top    = `${_panelStartTop()}px`;
+    this.el.style.bottom = 'auto';
     this.el.style.zIndex = '100';
     this.el.innerHTML = `
-      <div class="dp-header dp-draggable" style="cursor:grab">
-        <div class="dp-nav">
-          <button class="dp-nav-btn dp-prev" aria-label="Previous point">${SVG_PREV}</button>
-          <span class="dp-counter"></span>
-          <button class="dp-nav-btn dp-next" aria-label="Next point">${SVG_NEXT}</button>
-        </div>
-        <button class="dp-close-btn" aria-label="Close panel">${SVG_CLOSE}</button>
+      <div class="dp-tab">
+        <span class="dp-counter"></span>
       </div>
-      <div class="dp-scroll">
-        <div class="dp-type-badge"></div>
-        <h2 class="detail-title"></h2>
-        <div class="detail-meta"></div>
-        <div class="dp-image-wrap"></div>
-        <p class="detail-body"></p>
+      <div class="dp-body">
+        <div class="dp-header dp-draggable" style="cursor:grab">
+          <div class="dp-nav">
+            <button class="dp-nav-btn dp-prev" aria-label="Previous point">${SVG_PREV}</button>
+            <button class="dp-nav-btn dp-next" aria-label="Next point">${SVG_NEXT}</button>
+          </div>
+          <button class="dp-close-btn" aria-label="Close panel">${SVG_CLOSE}</button>
+        </div>
+        <div class="dp-scroll">
+          <div class="dp-type-badge"></div>
+          <h2 class="detail-title"></h2>
+          <div class="detail-meta"></div>
+          <div class="dp-image-wrap"></div>
+          <p class="detail-body"></p>
+        </div>
       </div>`;
     document.body.appendChild(this.el);
 
     this.dragHeader = this.el.querySelector('.dp-draggable');
+    this.tabEl      = this.el.querySelector('.dp-tab');
     this.counterEl  = this.el.querySelector('.dp-counter');
     this.prevBtn    = this.el.querySelector('.dp-prev');
     this.nextBtn    = this.el.querySelector('.dp-next');
@@ -110,6 +121,9 @@ class PanelInstance {
   }
 
   _wireEvents() {
+    // Bring this panel to front whenever the user clicks anywhere inside it.
+    this.el.addEventListener('pointerdown', () => this._bringToFront());
+
     this.closeBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -138,10 +152,11 @@ class PanelInstance {
     let ds = { x: 0, y: 0 };
     let ps = { x: 0, y: 0 };
 
-    this.dragHeader.addEventListener('pointerdown', (e) => {
+    const onDragStart = (e) => {
       if (e.button !== 0) return;
       dragging = true;
       this.dragHeader.style.cursor = 'grabbing';
+      if (this.tabEl) this.tabEl.style.cursor = 'grabbing';
       ds.x = e.clientX;
       ds.y = e.clientY;
       const m = this.dragTransform.match(/translate\(([^,]+),\s*([^)]+)\)/);
@@ -149,7 +164,10 @@ class PanelInstance {
       ps.y = m ? parseFloat(m[2]) : 0;
       document.body.style.userSelect = 'none';
       this._bringToFront();
-    });
+    };
+
+    this.dragHeader.addEventListener('pointerdown', onDragStart);
+    if (this.tabEl) this.tabEl.addEventListener('pointerdown', onDragStart);
 
     window.addEventListener('pointermove', (e) => {
       if (!dragging) return;
@@ -164,6 +182,7 @@ class PanelInstance {
       if (!dragging) return;
       dragging = false;
       this.dragHeader.style.cursor = 'grab';
+      if (this.tabEl) this.tabEl.style.cursor = '';
       document.body.style.userSelect = '';
       this.el.style.transition = '';
     });
@@ -191,7 +210,7 @@ class PanelInstance {
     this.renderPoint(false);
 
     this.displayOrder = openOrderCounter++;
-    this.el.style.top = `${12 + this.displayOrder * STACK_OFFSET}px`;
+    this.el.style.top = `${_panelStartTop() + this.displayOrder * STACK_OFFSET}px`;
 
     this.el.style.transform = this.dragTransform || '';
     this.el.classList.remove('hidden');
