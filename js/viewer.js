@@ -38,7 +38,6 @@ export function createViewer() {
     CONFIG.camera.near,
     CONFIG.camera.far
   );
-// camera perspective angle
   const perspCamera = new THREE.PerspectiveCamera(
     35,
     aspect,
@@ -57,7 +56,7 @@ export function createViewer() {
   perspCamera.position.set(isoXZ, isoY, isoXZ);
   perspCamera.lookAt(0, 0, 0);
 
-  let activeCamera = orthoCamera; // always orthographic
+  let activeCamera = orthoCamera;
 
   function setCameraMode(isPerspective) {
     const nextCamera = isPerspective ? perspCamera : orthoCamera;
@@ -126,7 +125,6 @@ export function createViewer() {
   function setModelSphere(radius, pad) {
     _sphereRadius = radius;
     _spherePad = pad;
-    // Seed _baseHalfH immediately so applyPanelToCamera uses the right base.
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (w && h) _baseHalfH = _baseHalfHFromSphere(w, h);
@@ -290,8 +288,7 @@ export function createViewer() {
         camera.zoom = newZoom;
         camera.updateProjectionMatrix();
 
-        // Re-apply pan bounds after the position shift.
-        if (_collagePanBounds) {
+            if (_collagePanBounds) {
           const clamped = controls.target.clone().clamp(_collagePanBounds.min, _collagePanBounds.max);
           const correction = clamped.sub(controls.target);
           controls.target.add(correction);
@@ -301,7 +298,6 @@ export function createViewer() {
       return;
     }
 
-    // Two-finger pan
     const scale = COLLAGE_PAN_SPEED / camera.zoom;
 
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
@@ -314,7 +310,6 @@ export function createViewer() {
     camera.position.add(panDelta);
     controls.target.add(panDelta);
 
-    // Clamp pan to collage bounds; pull camera back by the same offset.
     if (_collagePanBounds) {
       const clamped = controls.target.clone().clamp(_collagePanBounds.min, _collagePanBounds.max);
       const correction = clamped.sub(controls.target);

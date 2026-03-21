@@ -46,20 +46,11 @@ async function init() {
 
   setProgress(5, "Setting up 3D scene and camera");
 
-  // Ensure initial background and model type match 'recorded' submenu specs
-  // (bg: '#111111', mdT: 0)
-  // This must be set before _triggerMode is called, in case the model/scene defaults differ
-  // Set background color
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
-
-  // If scene is not yet created, set after createViewer()
 
   const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds, setPanelShift, snapPanelShift } = createViewer();
 
-  // Set initial background color for the scene
   scene.background = new THREE.Color(initialVisuals.bg);
-
-  // If model is loaded later, model texture blend will be set by _triggerMode
   const tooltipEl = document.getElementById("tooltip");
 
   try {
@@ -108,7 +99,6 @@ async function init() {
 
     setProgress(83, "Snapping data points to terrain surface");
     scene.updateMatrixWorld(true);
-    // Build once — reuse for any future CSV dataset added to config.csvFiles
     const snapToTerrain = buildTerrainSnapper(topoMeshes);
     for (const result of Object.values(csvResults)) {
       snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
@@ -292,9 +282,7 @@ async function init() {
         if (idx === _currentSubPhase) return;
         _currentSubPhase = idx;
         setNarrativeContent(_subPhaseKeys[idx]);
-        // Show only the active dataset group; hide the others.
         orderedGroups.forEach((g, i) => { if (g) g.visible = (i === idx); });
-        // Sync SVG annotation lines + dots and the side panels.
         for (const ann of _annData) {
           const active = ann.dataGroup === orderedGroups[idx];
           ann.svgLine.setAttribute('stroke-opacity', active ? '0.7' : '0');
@@ -467,7 +455,6 @@ async function init() {
           return;
         }
         if (name === 'collage') {
-          // Clean up any active narrative / detail state
           inNarrative = false;
           narrativeFree = false;
           scrollPos = 0;
@@ -480,11 +467,7 @@ async function init() {
           enableDissectedTilt(false);
           setControlsInteraction(true, true, false);
 
-          // Snap the narrative frustum shift to zero instantly so panelAnim
-          // never runs concurrently with goTopDown.
-          snapPanelShift();
-          // goTopDown now animates zoom internally; cancel any existing zoom tween
-          // so two independent zoom animations never run at the same time.
+          snapPanelShift(); // zero frustum shift instantly — prevents panelAnim fighting goTopDown
           stopZoomTween(true);
           goTopDown(homeZoom * 0.4);
           setExplode(explodeGroups.map(() => 0));

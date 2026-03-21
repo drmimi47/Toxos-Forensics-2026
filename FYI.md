@@ -5,129 +5,104 @@
 ## Entry Point
 
 **`index.html`**
-The only HTML page. Defines the static shell: preloader, header, navigation bar, legend, tooltip placeholder, about/credits overlays, footer, and the narrative **Start / Back** buttons. All dynamic content (detail panels, dissected annotations, snap cursor) is injected by JavaScript at runtime. Links the three CSS files and loads `js/main.js` as an ES module.
+Static shell: preloader, header (brand mark + `>>-->` nav arrow button), legend, tooltip placeholder, nav-menu overlay, about/credits overlays, footer, and Start/Back buttons. All dynamic content is injected at runtime. Links the three CSS files and loads `js/main.js` as an ES module.
 
 ---
 
 ## JavaScript (`js/`)
 
 **`main.js`**
-Application entry point and orchestrator. Runs on page load, calls all other modules in sequence, and wires everything together. Owns the preloader progress, the subnav click routing (Map / About / Credits / Collage), dark mode toggle logic, and the mode-switching state machine that shows/hides layers and updates body classes.
-
-Also owns the **scroll-driven narrative system** (see below). If you want to change what happens when a nav item is clicked, or how the narrative scrolls work, this is the file.
+Orchestrator. Runs on page load, calls all other modules, and wires everything together. Owns the preloader, mode-switching state machine (`recorded / dissected / fatberg / remediated / collage`), nav-arrow menu handlers, and the **scroll-driven narrative system** (see below). Start/Back/brand-mark click logic lives here. If you want to change what happens when a nav item is clicked or how the narrative scrolls work, this is the file.
 
 **`viewer.js`**
-Sets up the Three.js scene: orthographic camera, WebGL renderer, OrbitControls, lighting, and the render loop. Exports helpers used by `main.js` to shift the camera when a detail panel opens, animate the intro fly-in, and switch between standard and dissected/top-down camera angles.
+Three.js scene: orthographic camera, WebGL renderer, OrbitControls, lighting, and render loop. Exports camera animation helpers (`goHome`, `goDissectedView`, `goFatbergView`, `goTopDown`), the `setPanelShift` / `snapPanelShift` frustum-shift system, and the wheel-event pipeline (collage pan → narrative scroll → dissected tilt, in priority order). Touch this file for camera behavior, lighting, renderer settings, or scroll/tilt math.
 
-Also owns the **wheel-event pipeline** that routes scroll input between three exclusive handlers in priority order: collage pan → narrative scroll → dissected tilt (see below). Touch on this file if you need to change camera behavior, lighting, renderer settings, or scroll/tilt math.
+**`narrativeText.js`**
+Narrative content and right-side panel. Defines `NARRATIVE_CONTENT` (keys: `phase-0`, `phase-1-cso`, `phase-1-npdes`, `phase-1-rcra`, `phase-2`, `phase-3`). `setNarrativeContent(key)` fades out the current text and fades in the new content. The panel is hidden outside narrative mode via CSS.
 
 **`gltfLoader.js`**
-Loads the NYC topographic GLB model (`models/nyc_topo.glb`) using GLTFLoader with Draco decompression. Also owns the dark/light mode texture crossfade — a custom GLSL shader lerps between two terrain texture variants (`gltf_embedded_0.png` / `gltf_embedded_0_light.png`) as the mode changes. Touch this file to change how the 3D model loads or how the terrain responds to dark mode.
+Loads the NYC topographic GLB with Draco decompression. Owns the dark/light mode texture crossfade — a GLSL shader lerps between two terrain texture variants as mode changes. Touch this file to change how the 3D model loads or how the terrain responds to dark mode.
 
 **`csvLoader.js`**
-Parses the three dataset CSV files and places sprite markers in the 3D scene. Converts EPSG:2263 coordinates (US survey feet) to Three.js world units. Each marker is a canvas-drawn circle textured onto a sprite. Marker sizes are kept constant on screen by rescaling every frame in the render loop. Touch this file to change marker appearance, coordinate handling, or how CSV columns are read.
+Parses the three dataset CSVs and places sprite markers in the scene. Converts EPSG:2263 (US survey feet) to Three.js world units. Marker sizes stay constant on screen via per-frame rescaling. Touch this file to change marker appearance, coordinate handling, or CSV column mapping.
 
 **`terrainSnap.js`**
-Post-processes every CSV dataset after loading by raycasting each sprite downward against the topographic mesh and placing it on the terrain surface. Uses a quantized XZ grid cache so that densely clustered points (e.g. the ~1,600 RCRA points) share cached ray hits rather than re-casting for every point. A second pass runs a Median Absolute Deviation (MAD) outlier check to clamp border sprites that accidentally hit side/skirt geometry back to the dataset median. Touch this file to change snapping resolution (`GRID_CELL`), outlier sensitivity (`MAD_THRESHOLD`), or the `heightOffset` logic.
+Post-processes every CSV dataset by raycasting each sprite downward onto the terrain surface. Uses a quantized XZ grid cache for performance on dense datasets (e.g. ~1,600 RCRA points). A MAD outlier pass clamps border sprites that hit side geometry back to the dataset median. Touch this file to change snapping resolution (`GRID_CELL`), outlier sensitivity (`MAD_THRESHOLD`), or height offset logic.
 
 **`detailPanel.js`**
-Creates and manages the right-side detail card (desktop) / bottom sheet (mobile) that appears when a marker is clicked. Supports a stack of multiple open panels with prev/next navigation. Panels are draggable on desktop. Touch this file to change the layout, content, or behavior of the info card.
+Right-side detail card (desktop) / bottom sheet (mobile) shown when a marker is clicked. Supports a draggable stack of multiple open panels with prev/next navigation. `closeAllDetails()` is exported for use by Start/Back/ESC.
 
 **`utils.js`**
-Raycasting (translating mouse position to 3D marker hits), hover tooltips, marker selection/deselection, the snap cursor (crosshair that snaps to the nearest marker), double-tap detection for mobile, and the camera-framing helper that zooms to a selected point. Touch this file to change hover/click behavior or tooltip content.
+Raycasting (mouse → 3D marker hits), marker selection/deselection, the snap cursor (crosshair snapping to nearest marker), double-tap detection, and the `frameBoundingBox` camera-framing helper. Touch this file to change hover/click behavior.
 
 **`labels.js`**
-Adds CSS2D borough/river name labels and anchored scene images (the small thumbnails floating over the map) to the 3D scene. CSS2D means these are HTML elements positioned over the canvas by Three.js, not geometry. Touch this file to add, remove, or reposition map labels and floating images.
+CSS2D borough/river name labels and anchored scene images floating over the map. Labels are hidden during narrative scroll phases and restored at interactive states. Touch this file to add, remove, or reposition map labels and floating images.
 
 **`collage.js`**
-Handles the Collage view mode. Loads flat image planes (`assets/images/collage-drawing*.png`) and positions them around the four sides of the model bounding box (North / East / South / West). Images fade in/out when Collage mode is toggled. The `COLLAGE_IMAGES` array at the top of this file is where images are configured and positioned.
+Collage view mode. Loads flat image planes and positions them around the four sides of the model bounding box. `COLLAGE_IMAGES` at the top of this file is where images are configured.
 
 **`apiWeather.js`**
-Placeholder module for a future weather data integration. Currently does nothing functional. The API URL is set in `config/config.js` under `weatherApiUrl`.
+Placeholder for a future weather API integration. Currently non-functional. API URL slot in `config/config.js → weatherApiUrl`.
 
 ---
 
 ## Scroll-Driven Narrative System
 
-The site has a continuous, scroll-triggered cinematic experience separate from the nav-click modes. It is split across `viewer.js` (wheel routing, tilt math) and `main.js` (phase logic, dataset reveals, camera calls).
+Split across `viewer.js` (wheel routing, tilt math) and `main.js` (phase logic, dataset reveals, camera calls).
 
 ### Entry / Exit
 
 | UI Element | Behavior |
 |---|---|
-| **Start** button (fixed, bottom-center) | Enters narrative; hides itself |
-| **Back** button (fixed, bottom-center) | Visible only at narrative end (free mode) or on backward exit; calls `_exitNarrative()` |
+| **Start** button | Enters narrative; locks controls; applies phase 0 |
+| **Back** button | Visible at narrative end or on backward exit; calls `_exitNarrative()` |
+| **Brand mark** / **Map** nav (if in narrative) | Also calls `_exitNarrative()` |
 
-Clicking **Start** locks OrbitControls, switches to phase 0 (Dissected view, CSO only), animates the camera to near-top-down (`goDissectedTopDown`), then hands control to the scroll handler once that animation completes.
-
-Scrolling backward past −400 scroll units from the start also calls `_exitNarrative()`, which restores the Recorded/home state and re-enables controls.
+Scrolling backward past −400 units from start also exits via `_exitNarrative()`.
 
 ### Scroll Phases
 
-Total scroll range: **4,500 units** (3 phases × 1,500 units each).
+Total scroll range: **6,000 units** (4 phases × 1,500 units).
 
-| Scroll range | Phase | Mode applied | Camera |
+| Scroll range | Phase | Mode | Camera |
 |---|---|---|---|
-| 0 – 1,500 | 0 — Dissected | Exploded layers, dark theme | Tilts from near-top-down to oblique |
-| 1,500 – 3,000 | 1 — Fatberg | Flat view, white theme | Continues tilting |
-| 3,000 – 4,500 | 2 — Remediated | Home layers, light theme | Continues tilting |
-| ≥ 4,500 | Free | Remediated stays active | Tilt locked; rotate/pan re-enabled |
+| 0 – 1,500 | 0 — All data exploded | All 3 datasets visible, dark theme | Default angle → tilts toward top-down |
+| 1,500 – 3,000 | 1 — Dissected reveal | CSO → NPDES → RCRA sequentially | Continues tilting |
+| 3,000 – 4,500 | 2 — Fatberg | Flat view, dark theme | Continues tilting |
+| 4,500 – 6,000 | 3 — Remediated | Home layers, light theme | Continues tilting |
+| ≥ 6,000 | Free | Remediated stays active | Tilt locked; rotate/pan re-enabled |
 
-Within phase 0, the three datasets are revealed one at a time as sub-phases (each covering 500 scroll units): CSO → NPDES → RCRA. Only the active sub-phase group is visible; annotation lines and side panels update to match.
+Within phase 1, three sub-phases (500 units each) reveal CSO → NPDES → RCRA one at a time with annotation lines and side panels.
 
 ### Camera Tilt
 
-The camera tilt angle (polar angle θ, in spherical coordinates relative to the orbit target) is driven linearly from `TILT_THETA_MIN` (≈ 0.05 rad, nearly top-down) to `TILT_THETA_MAX` (1.40 rad, ≈ 80° oblique) as scroll position moves from 0 to 4,500. Lerp factor per frame: 0.10, so the camera eases into the target angle.
+Polar angle θ is driven linearly from `TILT_THETA_MIN` (≈ 0.05 rad, near top-down) toward `TILT_THETA_MAX` (1.40 rad, ≈ 80° oblique) across the full scroll range. The tilt lerps at 0.10/frame and holds azimuth constant throughout.
 
-The tilt system maintains the camera's azimuth angle (φ) as a constant — it only changes elevation, not horizontal direction. This keeps the model orientation consistent throughout the narrative.
+During Start, the model frustum shifts left (`PANEL_PX` in `viewer.js`) to make room for the narrative text panel on the right. The frustum snaps back on exit.
 
-In manual dissected mode (entered via nav, not narrative), scroll directly adjusts `_tiltTargetTheta` at a rate of `TILT_SPEED = 0.0007` per scroll unit, clamped to the same min/max range.
+### Annotation Lines (Phase 0–1)
 
-### Wheel-Event Routing (`viewer.js`)
-
-Three wheel listeners are registered on the canvas in priority order (first registered = highest priority via `stopImmediatePropagation`):
-
-1. **Collage pan** (`_onCollagePanWheel`) — active only in Collage mode; intercepts all scroll and pinch events for 2D pan/zoom, blocks OrbitControls.
-2. **Narrative scroll** (`_onNarrativeWheel`) — active when `inNarrative = true`; calls the handler set by `setNarrativeScrollHandler(fn)` from `main.js`. If the handler returns `true`, the event is consumed (prevents OrbitControls zoom).
-3. **Dissected tilt** (`_onTiltWheel`) — active when `_tiltActive = true` (manual dissected mode); adjusts tilt target directly, always calls `preventDefault`.
-
-### Annotation Lines (Dissected / Narrative Phase 0)
-
-Three annotation entries are created at startup (`_annData` in `main.js`): CSO (right side), NPDES (left side), RCRA (right side). Each has:
-- An SVG `<line>` from the sprite's projected screen position to the text label
-- An SVG `<circle>` dot at the sprite anchor point
-- A `.diss-panel` DOM element with dataset name and body text
-
-Lines are updated every frame via `_tickDissLines()` (runs its own `requestAnimationFrame` loop while `isDissected` is true). Clicking a panel toggles its dataset's visibility and dims the line/dot.
+Three `_annData` entries (`_annData` in `main.js`): CSO (right), NPDES (left), RCRA (right). Each has an SVG `<line>` from the sprite's projected screen position to the text panel. Updated every frame by `_tickDissLines()`. Clicking a panel toggles that dataset's visibility.
 
 ---
 
 ## Configuration (`config/`)
 
 **`config/config.js`**
-Single source of truth for all tunable parameters: model file path, coordinate origin offset, unit conversion factor, CSV file paths and dataset colors, marker sizing, camera defaults, and lighting intensities. Change values here rather than hunting through JS files. Dataset colors defined here must stay in sync with the CSS custom properties in `css/color.css`.
-
-**`config/env.example.js`**
-Template showing how to provide secret keys (e.g. a weather API key) without committing them to the repository. Copy to `config/env.js` and fill in real values.
+Single source of truth for tunable parameters: model path, coordinate origin offset, unit conversion, CSV paths and colors, marker sizing, and camera defaults (`initialZoom`, `narrativeZoom`). Dataset colors here must stay in sync with `css/color.css`.
 
 ---
 
 ## Stylesheets (`css/`)
 
 **`css/color.css`**
-All color definitions for the site. Edit this file to retheme colors without touching layout code. Contains `@property` declarations (required for CSS transitions on custom properties), light mode tokens in `:root`, dark mode overrides on `body.dark`, and dataset dot colors. Loaded before `style.css`.
+All color tokens. Light mode in `:root`, dark mode overrides on `body.dark`. `@property` declarations required for CSS transitions on custom properties. `--bg-dark` is also set per-frame from JS (`tickModeFrame`) so the body background stays in sync with the Three.js scene background.
 
 **`css/style.css`**
-All layout, component, and state styles. Covers the preloader, header, subnav, legend, tooltip, detail panel, overlays, footer, scene labels, dissected annotations, snap cursor, collage-mode and dissected-mode state overrides, the narrative Start/Back buttons, and responsive mobile rules. Uses CSS custom properties from `color.css` for all colors.
-
-Key narrative-related rules:
-- `.start-btn` / `#back-btn` — fixed bottom-center buttons; `.hidden` fades them out with pointer-events disabled
-- `.ctrl-scroll-tilt` — shown only in `.dissected-mode`; hidden otherwise
-- `.diss-svg`, `.diss-panels--right`, `.diss-panels--left` — annotation SVG and text panels; opacity transitions on/off
-- `:is(.collage-mode, .fatberg-mode, .dissected-mode) .legend` — hides legend in non-map modes
+All layout and component styles: preloader, header, legend, detail panels, overlays (credits, about, nav-menu), footer, dissected annotations, snap cursor, narrative panel, Start/Back buttons, and responsive mobile rules.
 
 **`css/threejs.css`**
-Minimal styles scoped specifically to the Three.js canvas container (`.viewer-container`). Kept separate because these rules are coupled to the renderer's DOM structure rather than the page's UI components.
+Minimal styles for the Three.js canvas container (`.viewer-container`). The canvas is always full-width; model position is shifted via frustum offset, not CSS.
 
 ---
 
@@ -139,7 +114,7 @@ Minimal styles scoped specifically to the Three.js canvas container (`.viewer-co
 | `npdes_2263_clipped.csv` | Water Discharge Permits (NPDES) | ~80 |
 | `rcra_2263_clipped.csv` | Hazardous Waste Facilities (RCRA) | ~1,600 |
 
-All coordinates are in EPSG:2263 (New York State Plane, US survey feet). The loader converts them to metres for Three.js. After conversion, `terrainSnap.js` raycasts each marker onto the terrain surface.
+All coordinates in EPSG:2263 (New York State Plane, US survey feet), converted to metres for Three.js.
 
 ---
 
@@ -149,15 +124,13 @@ All coordinates are in EPSG:2263 (New York State Plane, US survey feet). The loa
 |---|---|
 | `assets/textures/gltf_embedded_0.png` | Dark mode terrain texture |
 | `assets/textures/gltf_embedded_0_light.png` | Light mode terrain texture |
-| `assets/textures/gltf_embedded_0.jpeg` | Original embedded texture (reference) |
-| `assets/images/cso.jpg` / `npdes.jpg` / `rcra.jpg` | Thumbnail images shown in detail panels |
+| `assets/images/cso.jpg` / `npdes.jpg` / `rcra.jpg` | Thumbnails in detail panels |
 | `assets/images/IMG_1–4.jpg` | Scene images anchored to map locations |
 | `assets/images/collage-drawing1–4.png` | Flat drawing planes for Collage mode |
-| `assets/icons/marker_placeholder.png` | Fallback marker icon |
 
 ---
 
 ## 3D Model (`models/`)
 
-**`models/nyc_topo.glb`** (67.5 MB)
-Draco-compressed GLB of the NYC topographic model. Exported from Rhino with Z-up already converted to Y-up (Three.js convention). Coordinates are in EPSG:2263. The origin offset in `config/config.js` shifts the model centroid to near-zero in world space.
+**`models/nyc_topo_compressed.glb`** (67.5 MB)
+Draco-compressed GLB of NYC topography. Exported from Rhino, Z-up → Y-up already converted. Coordinates in EPSG:2263; origin offset in `config/config.js` shifts the centroid to near-zero in world space.
