@@ -4,8 +4,10 @@
   left: 0;
   right: 0;
   height: 100%;
+  transition: right 0.9s cubic-bezier(0.32, 0.72, 0, 1);
   /* no z-index — keeps viewer in body stacking context so mix-blend-mode blends against canvas */
 }
+
 
 .viewer-container canvas {
   display: block;

@@ -4,10 +4,11 @@ import { createViewer } from "./viewer.js";
 import { loadModel } from "./gltfLoader.js";
 import { loadAllCSV } from "./csvLoader.js";
 import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
-import { closeDetail, getDetailType } from "./detailPanel.js";
+import { closeDetail, closeAllDetails, getDetailType } from "./detailPanel.js";
 import { addAllLabels, addAllImages } from "./labels.js";
 import { createCollagePlanes } from "./collage.js";
 import { buildTerrainSnapper } from "./terrainSnap.js";
+import { initNarrativePanel, setNarrativeContent } from "./narrativeText.js";
 
 // Per-mode visual settings. Edit these values to retheme each submenu independently.
 // bg:           hex color for the 3D viewport background.
@@ -41,6 +42,8 @@ function hidePreloader() {
 
 async function init() {
 
+  initNarrativePanel();
+
   setProgress(5, "Setting up 3D scene and camera");
 
   // Ensure initial background and model type match 'recorded' submenu specs
@@ -51,7 +54,7 @@ async function init() {
 
   // If scene is not yet created, set after createViewer()
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds, setPanelShift, snapPanelShift } = createViewer();
 
   // Set initial background color for the scene
   scene.background = new THREE.Color(initialVisuals.bg);
@@ -171,6 +174,7 @@ async function init() {
     });
 
     let _triggerMode = null;
+    let _labelsVisible = true;
     let isDissected = false;
     let _currentMode = 'recorded';
 
@@ -282,9 +286,12 @@ async function init() {
 
       let _currentSubPhase = -1;
 
+      const _subPhaseKeys = ['phase-1-cso', 'phase-1-npdes', 'phase-1-rcra'];
+
       function _applyDissectedSubPhase(idx) {
         if (idx === _currentSubPhase) return;
         _currentSubPhase = idx;
+        setNarrativeContent(_subPhaseKeys[idx]);
         // Show only the active dataset group; hide the others.
         orderedGroups.forEach((g, i) => { if (g) g.visible = (i === idx); });
         // Sync SVG annotation lines + dots and the side panels.
@@ -376,8 +383,10 @@ async function init() {
           const el = o.element;
           el.style.transition = `opacity ${FADE_MS}ms ease`;
           if (toVisible) {
-            o.visible = true;
-            requestAnimationFrame(() => { el.style.opacity = '1'; });
+            if (_labelsVisible) {
+              o.visible = true;
+              requestAnimationFrame(() => { el.style.opacity = '1'; });
+            }
           } else {
             el.style.opacity = '0';
             setTimeout(() => {
@@ -458,6 +467,22 @@ async function init() {
           return;
         }
         if (name === 'collage') {
+          // Clean up any active narrative / detail state
+          inNarrative = false;
+          narrativeFree = false;
+          scrollPos = 0;
+          currentPhase = -1;
+          _currentSubPhase = -1;
+          document.body.classList.remove('narrative-mode');
+          setNarrativeContent(null);
+          closeDetail();
+          backBtn?.classList.add('hidden');
+          enableDissectedTilt(false);
+          setControlsInteraction(true, true, false);
+
+          // Snap the narrative frustum shift to zero instantly so panelAnim
+          // never runs concurrently with goTopDown.
+          snapPanelShift();
           // goTopDown now animates zoom internally; cancel any existing zoom tween
           // so two independent zoom animations never run at the same time.
           stopZoomTween(true);
@@ -502,12 +527,29 @@ async function init() {
 
           if (!isMapMenu) {
             startBtn?.classList.add('hidden');
-          } else if (!inNarrative) {
+          } else if (inNarrative) {
+            // Map / brand-mark during narrative = Back button behaviour.
+            closeAllDetails();
+            _exitNarrative();
+            return;
+          } else {
             startBtn?.classList.remove('hidden');
           }
 
           _doSwitchMode(name);
         });
+      });
+
+      document.querySelector('.brand-mark')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (inNarrative) {
+          closeAllDetails();
+          _exitNarrative();
+        } else {
+          closeAllDetails();
+          startBtn?.classList.remove('hidden');
+          _doSwitchMode('map');
+        }
       });
 
       // ── Continuous scroll-driven narrative ──────────────────────
@@ -530,6 +572,7 @@ async function init() {
         document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
 
         if (phase === 0) {
+          setNarrativeContent('phase-0');
           // All datasets visible and exploded — pure data demonstration, no annotation text
           isDissected = true;
           _currentMode = 'dissected';
@@ -561,6 +604,7 @@ async function init() {
             for (const el of _dissEls) el.style.opacity = '1';
           }));
         } else if (phase === 2) {
+          setNarrativeContent('phase-2');
           isDissected = false;
           _currentMode = 'fatberg';
           document.body.classList.remove('dissected-mode', 'collage-mode');
@@ -570,6 +614,7 @@ async function init() {
           setExplode(explodeGroups.map(() => 0));
           for (const el of _dissEls) el.style.opacity = '0';
         } else if (phase === 3) {
+          setNarrativeContent('phase-3');
           isDissected = false;
           _currentMode = 'remediated';
           document.body.classList.remove('dissected-mode', 'fatberg-mode', 'collage-mode');
@@ -589,6 +634,7 @@ async function init() {
         scrollPos = 0;
         currentPhase = -1;
         _currentSubPhase = -1;
+        setNarrativeContent(null);
         backBtn?.classList.add('hidden');
         // Restore all dataset groups and annotation panels to full visibility.
         orderedGroups.forEach(g => { if (g) g.visible = true; });
@@ -599,7 +645,9 @@ async function init() {
         enableDissectedTilt(false);
         isDissected = false;
         _currentMode = 'recorded';
-        document.body.classList.remove('collage-mode', 'dissected-mode', 'fatberg-mode');
+        document.body.classList.remove('collage-mode', 'dissected-mode', 'fatberg-mode', 'narrative-mode');
+        setPanelShift(false);
+        _labelsVisible = true;
         fadeOverlays(true);
         if (_triggerMode) _triggerMode(MODE_VISUALS.recorded);
         goHome();
@@ -619,8 +667,7 @@ async function init() {
       const backBtn = document.getElementById('back-btn');
       if (backBtn) {
         backBtn.addEventListener('click', () => {
-          // Return to the true initial state (recorded/home view) so
-          // narrative can be restarted from the same first-load position.
+          closeAllDetails();
           _exitNarrative();
         });
       }
@@ -628,6 +675,7 @@ async function init() {
       const startBtn = document.getElementById('start-btn');
       if (startBtn) {
         startBtn.addEventListener('click', () => {
+          closeAllDetails();
           startBtn.classList.add('hidden');
           inNarrative = true;
           narrativeFree = false;
@@ -637,10 +685,20 @@ async function init() {
           collage.hide();
           enableCollagePan(false);
           setControlsInteraction(false, false, false);
+          document.body.classList.add('narrative-mode');
+          setPanelShift(true);
+
+          // Hide anchored scene labels during the narrative scroll experience.
+          _labelsVisible = false;
+          for (const label of sceneLabels) {
+            label.element.style.transition = 'opacity 300ms ease';
+            label.element.style.opacity = '0';
+          }
+          setTimeout(() => { for (const label of sceneLabels) label.visible = false; }, 320);
 
           // Apply phase 0: all datasets exploded, no annotation text.
           _applyPhase(0);
-          setZoom(homeZoom);
+          setZoom(homeZoom * (CONFIG.camera.narrativeZoom ?? 0.78));
 
           // Reset to default load-in rotation; tilt drives from there toward top-down
           goHome();
@@ -683,15 +741,26 @@ async function init() {
           _applyDissectedSubPhase(subIdx);
         }
 
-        // Reached the end → enter free rotate/pan mode
+        // Reached the end → recenter model and enter free rotate/pan mode
         if (delta > 0 && scrollPos >= TOTAL_SCROLL) {
           narrativeFree = true;
           backBtn?.classList.remove('hidden');
           enableDissectedTilt(false);
-          // Enable rotate/pan immediately; delay zoom by 2s so accidental scroll
-          // input at the end of the narrative doesn't instantly zoom the model.
-          setControlsInteraction(true, true, false);
-          setTimeout(() => setControlsInteraction(true, true, true), 2000);
+          document.body.classList.remove('narrative-mode');
+          setPanelShift(false);
+          setZoom(homeZoom);
+          _labelsVisible = true;
+          for (const label of sceneLabels) {
+            label.visible = true;
+            label.element.style.transition = 'opacity 400ms ease';
+            label.element.style.color = MODE_VISUALS.remediated.labelColor;
+            label.element.style.opacity = MODE_VISUALS.remediated.labelOpacity;
+          }
+          goHome();
+          setAnimOnComplete(() => {
+            setControlsInteraction(true, true, false);
+            setTimeout(() => setControlsInteraction(true, true, true), 2000);
+          });
         }
 
         return true;
@@ -763,6 +832,7 @@ async function init() {
 
       setModeProgress(modelT);
       scene.background.lerpColors(bgColorFrom, bgColorTo, modeT);
+      document.body.style.setProperty('--bg-dark', '#' + scene.background.getHexString());
 
       const bgSettled = Math.abs(modeT - modeTarget) <= 0.0001;
       const modelSettled = Math.abs(modelT - modelTarget) <= 0.0001;
@@ -795,6 +865,7 @@ async function init() {
 
       // Double RAF ensures these run after fadeOverlays' single RAF (which sets opacity '1').
       requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!_labelsVisible) return;
         for (const label of sceneLabels) {
           label.element.style.color = labelColor;
           label.element.style.opacity = labelOpacity;
@@ -818,35 +889,5 @@ async function init() {
   }
 }
 
-{
-  const dot = document.getElementById('subnav-dot');
-  const wrap = document.querySelector('.subnav-wrap');
-  const items = document.querySelectorAll('#subnav .subnav-item');
-
-  function moveDot(item, animate) {
-    const wrapRect = wrap.getBoundingClientRect();
-    const itemRect = item.getBoundingClientRect();
-    const x = itemRect.left - wrapRect.left + itemRect.width / 2 - 2;
-    if (!animate) dot.style.transition = 'none';
-    dot.style.transform = `translateX(${x}px)`;
-    if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => { dot.style.transition = ''; }));
-  }
-
-  const initialActive = document.querySelector('.subnav-item.active');
-  if (dot && wrap && initialActive) moveDot(initialActive, false);
-
-  items.forEach(item => {
-    item.addEventListener('click', () => {
-      items.forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      moveDot(item, true);
-    });
-  });
-
-  window.addEventListener('resize', () => {
-    const current = document.querySelector('.subnav-item.active');
-    if (dot && wrap && current) moveDot(current, false);
-  });
-}
 
 init();

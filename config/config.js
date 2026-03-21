@@ -31,7 +31,8 @@ const CONFIG = {
     near: 1,
     far: 50000,
     orthoSize: 3000,
-    initialZoom: 0.80,
+    initialZoom: 0.99,   // ← fraction of viewport the model fills in the interactive state; higher = more zoomed in
+    narrativeZoom: 0.92, // ← zoom multiplier during narrative scroll (relative to initialZoom); lower = smaller model
     position: { x: 0, y: 2500, z: 4000 }
   },
 

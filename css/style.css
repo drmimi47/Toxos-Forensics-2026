@@ -25,7 +25,6 @@ body {
   user-select: none;
   -webkit-user-select: none;
   transition:
-    --bg-dark 0.5s ease,
     --bg-panel 0.5s ease,
     --border 0.5s ease,
     --border-bright 0.5s ease,
@@ -629,6 +628,74 @@ body {
   margin: 0;
 }
 
+/* ── Narrative right-side text panel ──────────────────────────────────── */
+.narrative-panel {
+  position: fixed;
+  top: 0;
+  right: 24px;
+  width: 540px;
+  height: 100%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 80px 0 36px 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(16px);
+  transition:
+    opacity 0.7s cubic-bezier(0.32, 0.72, 0, 1) 0.4s,
+    transform 0.7s cubic-bezier(0.32, 0.72, 0, 1) 0.4s;
+}
+
+body.narrative-mode .narrative-panel {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+}
+
+body.collage-mode .narrative-panel,
+body.collage-mode #legend {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Content cross-fade on phase change */
+.narrative-panel--transitioning .narrative-heading,
+.narrative-panel--transitioning .narrative-body {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.narrative-heading {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  margin: 0 0 20px;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.narrative-body {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.narrative-body p {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text-dim);
+  margin: 0 0 16px;
+}
+
+.narrative-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
 .overlay--about,
 .overlay--credits {
   position: fixed;

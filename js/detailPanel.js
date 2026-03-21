@@ -402,6 +402,11 @@ export function closeDetail() {
   }
 }
 
+export function closeAllDetails() {
+  panelMap.forEach(p => { if (p.isOpen) p.close(); });
+  history.replaceState(null, '', window.location.pathname);
+}
+
 export function isDetailOpen()  { return openCount > 0; }
 
 export function getDetailType() {

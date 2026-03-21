@@ -104,7 +104,9 @@ export function createViewer() {
 
   let pendingW = 0, pendingH = 0;
 
-  const PANEL_PX = 404;
+  // Half the narrative panel width (540px + 24px gap = 564 → 282px shift to
+  // centre the model in the left portion of the full-width canvas).
+  const PANEL_PX = 610; // ← increase to push model further left, decrease to move it right
   let panelT = 0;
   let panelTarget = 0;
   let panelPrevTime = performance.now();
@@ -191,19 +193,7 @@ export function createViewer() {
   window.addEventListener('resize', handleResize);
   new ResizeObserver(handleResize).observe(container);
 
-  window.addEventListener('detail-open', () => {
-    if (document.body.classList.contains('collage-mode')) return;
-    const camera = activeCamera;
-    if (!_baseHalfH && camera.isOrthographicCamera) _baseHalfH = camera.top;
-    panelTarget = 1;
-    panelPrevTime = performance.now();
-  });
-  window.addEventListener('detail-close', (e) => {
-    if ((e.detail?.panelCount ?? 0) === 0) {
-      panelTarget = 0;
-      panelPrevTime = performance.now();
-    }
-  });
+  // Detail panels are fixed overlays — no camera shift needed on open/close.
 
   let topDownAnim = null;
   let homeState = null;
@@ -661,5 +651,20 @@ export function createViewer() {
     if (topDownAnim && !topDownAnim.done) topDownAnim.onComplete = fn;
   }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds };
+  // Drive the camera frustum shift (0 = centred, 1 = shifted left to clear
+  // the right-side narrative panel) without resizing the canvas.
+  function setPanelShift(enable) {
+    panelTarget = enable ? 1 : 0;
+  }
+
+  // Instantly zero the frustum shift with no animation — call before goTopDown
+  // so panelAnim never runs concurrently with the camera transition.
+  function snapPanelShift() {
+    panelTarget = 0;
+    panelT = 0;
+    if (animate.panelAnim) animate.panelAnim = null;
+    applyPanelToCamera();
+  }
+
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds, setPanelShift, snapPanelShift };
 }

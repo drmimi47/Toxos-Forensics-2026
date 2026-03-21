@@ -49,7 +49,7 @@
 }
 
 body.dark {
-  --bg-dark:          #0c0c0c;
+  --bg-dark:          #111111;
   --bg-panel:         rgba(22, 22, 22, 0.96);
   --bg-panel-solid:   #111111;
   --border:           rgba(255, 255, 255, 0.08);
