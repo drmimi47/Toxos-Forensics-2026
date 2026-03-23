@@ -366,7 +366,7 @@ export function createViewer() {
       e.stopImmediatePropagation();
     }
   }
-  renderer.domElement.addEventListener('wheel', _onNarrativeWheel, { passive: false });
+  window.addEventListener('wheel', _onNarrativeWheel, { passive: false });
 
   function setNarrativeScrollHandler(fn) { _narrativeScrollHandler = fn; }
 

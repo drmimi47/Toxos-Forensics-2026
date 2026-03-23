@@ -11,11 +11,19 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.5;
@@ -45,17 +53,29 @@ body {
   color: var(--bg-panel-solid);
 }
 
-::-webkit-scrollbar {
-  width: 5px;
+/* ── Custom overlay scrollbar ─────────────────────────────────────────── */
+.page-scrollbar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 12px;
+  height: 100%;
+  z-index: 500;
+  pointer-events: none;
+  background: rgba(128, 128, 128, 0.15);
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-dark);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--accent-dim);
-  border-radius: 3px;
+.page-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 40px;
+  background: rgba(140, 140, 140, 0.55);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  will-change: transform;
 }
 
 .preloader {
@@ -154,7 +174,7 @@ body {
 }
 
 .site-header {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -271,7 +291,7 @@ body {
 }
 
 .legend {
-  position: absolute;
+  position: fixed;
   bottom: 64px;
   left: 0;
   padding: 24px;
@@ -654,6 +674,15 @@ body.narrative-mode .narrative-panel {
   pointer-events: all;
 }
 
+body.scroll-locked {
+  overflow: hidden;
+}
+
+body.scroll-locked .page-scrollbar,
+body.collage-mode .page-scrollbar {
+  display: none;
+}
+
 body.collage-mode .narrative-panel,
 body.collage-mode #legend {
   opacity: 0 !important;
@@ -785,7 +814,7 @@ body.collage-mode #legend {
 }
 
 .site-footer {
-  position: absolute;
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;

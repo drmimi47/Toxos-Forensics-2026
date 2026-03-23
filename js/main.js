@@ -28,6 +28,20 @@ const preloaderEl = document.querySelector(".preloader");
 const preBarEl = document.getElementById("preloader-bar");
 const preTextEl = document.getElementById("preloader-text");
 
+function updatePageScrollLock() {
+  const isLoading = !!preloaderEl && !preloaderEl.classList.contains("done");
+  const isCollage = document.body.classList.contains("collage-mode");
+  const lock = isLoading || isCollage;
+  document.body.classList.toggle("scroll-locked", lock);
+  document.documentElement.classList.toggle("scroll-locked", lock);
+}
+
+function getPageScroller() {
+  const bodyScrollable = document.body.scrollHeight > document.body.clientHeight;
+  if (bodyScrollable) return document.body;
+  return document.scrollingElement || document.documentElement || document.body;
+}
+
 function setProgress(pct, label) {
   if (preBarEl) preBarEl.style.width = `${Math.min(pct, 100)}%`;
   if (preTextEl) preTextEl.textContent = label;
@@ -37,10 +51,13 @@ function hidePreloader() {
   setProgress(100, "Complete");
   setTimeout(() => {
     preloaderEl?.classList.add("done");
+    updatePageScrollLock();
   }, 400);
 }
 
 async function init() {
+
+  updatePageScrollLock();
 
   initNarrativePanel();
 
@@ -49,6 +66,10 @@ async function init() {
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
   const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds, setPanelShift, snapPanelShift } = createViewer();
+
+  renderer.domElement.addEventListener('wheel', (e) => {
+    // Non-narrative wheel events are handled by viewer controls directly.
+  }, { passive: true });
 
   scene.background = new THREE.Color(initialVisuals.bg);
   const tooltipEl = document.getElementById("tooltip");
@@ -438,6 +459,7 @@ async function init() {
         document.body.classList.toggle('collage-mode', isCollage);
         document.body.classList.toggle('dissected-mode', isDissected);
         document.body.classList.toggle('fatberg-mode', isFatberg);
+        updatePageScrollLock();
 
         document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
 
@@ -544,6 +566,17 @@ async function init() {
       const TOTAL_SCROLL = SCROLL_PER_PHASE * 4;
       const EXIT_BACK_THRESH = 400; // how far past 0 before exiting to recorded
 
+      const _sbThumb = document.getElementById('page-scrollbar-thumb');
+      const _sbTrack = document.getElementById('page-scrollbar');
+      const _sbThumbH = _sbThumb ? _sbThumb.offsetHeight : 40;
+      function _syncDocumentScrollbar(pos) {
+        if (!_sbThumb || !_sbTrack) return;
+        const clampedPos = Math.max(0, Math.min(TOTAL_SCROLL, pos));
+        const pct = clampedPos / TOTAL_SCROLL;
+        const offset = pct * (_sbTrack.clientHeight - _sbThumbH);
+        _sbThumb.style.transform = `translateY(${offset}px)`;
+      }
+
       let inNarrative = false;
       let narrativeFree = false; // at TOTAL_SCROLL: free rotate/pan, scroll locked
       let scrollPos = 0;
@@ -618,6 +651,7 @@ async function init() {
         currentPhase = -1;
         _currentSubPhase = -1;
         setNarrativeContent(null);
+        _syncDocumentScrollbar(0);
         backBtn?.classList.add('hidden');
         // Restore all dataset groups and annotation panels to full visibility.
         orderedGroups.forEach(g => { if (g) g.visible = true; });
@@ -664,6 +698,7 @@ async function init() {
           narrativeFree = false;
           scrollPos = 0;
           currentPhase = -1;
+          _syncDocumentScrollbar(0);
 
           collage.hide();
           enableCollagePan(false);
@@ -708,6 +743,7 @@ async function init() {
 
         // Clamp for theta / phase computation
         const pos = Math.max(0, Math.min(TOTAL_SCROLL, scrollPos));
+        _syncDocumentScrollbar(pos);
 
         // Map scroll position linearly from default angle → top-down
         const { min: tMin } = getTiltInfo();
@@ -727,6 +763,7 @@ async function init() {
         // Reached the end → recenter model and enter free rotate/pan mode
         if (delta > 0 && scrollPos >= TOTAL_SCROLL) {
           narrativeFree = true;
+          _syncDocumentScrollbar(TOTAL_SCROLL);
           backBtn?.classList.remove('hidden');
           enableDissectedTilt(false);
           document.body.classList.remove('narrative-mode');
