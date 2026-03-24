@@ -38,11 +38,6 @@
   <!-- Three.js canvas container -->
   <div id="viewer-container" class="viewer-container"></div>
 
-  <!-- Intro headline shown after loading -->
-  <section id="intro-headline-stage" class="intro-headline-stage" aria-hidden="true">
-    <h1 class="intro-headline">We are Exposing Toxicity in New Town Creek</h1>
-  </section>
-
   <!-- Header -->
   <header id="header" class="site-header">
     <a href="#" class="brand-mark">TOXOS<span class="brand-sub">lab</span></a>
@@ -175,10 +170,6 @@
       if (el) el.textContent = `Last Updated ${mon} ${day} ${hh}:${mm}`;
     }).catch(() => { });
   </script>
-
-  <!-- Narrative START / BACK buttons -->
-  <button id="start-btn" class="start-btn">Start</button>
-  <button id="back-btn" class="start-btn hidden">Back</button>
 
   <!-- Entry point -->
   <script type="module" src="./js/main.js"></script>

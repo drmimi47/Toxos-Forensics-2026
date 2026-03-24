@@ -27,54 +27,8 @@ const MODE_VISUALS = {
 const preloaderEl = document.querySelector(".preloader");
 const preBarEl = document.getElementById("preloader-bar");
 const preTextEl = document.getElementById("preloader-text");
-const introHeadlineStageEl = document.getElementById("intro-headline-stage");
 
-let introHeadlineCleanup = null;
-
-function completeIntroHeadlineScroll() {
-  if (introHeadlineCleanup) {
-    introHeadlineCleanup();
-    introHeadlineCleanup = null;
-  }
-}
-
-function setupIntroHeadlineScroll() {
-  if (!introHeadlineStageEl) return;
-  if (document.body.classList.contains("intro-complete")) return;
-
-  const html = document.documentElement;
-  const body = document.body;
-
-  html.classList.add("intro-scroll-mode");
-  body.classList.add("intro-scroll-mode");
-  window.scrollTo(0, 0);
-
-  const getIntroExitY = () => Math.max(0, introHeadlineStageEl.offsetHeight - window.innerHeight);
-
-  const onScroll = () => {
-    if (window.scrollY >= getIntroExitY()) {
-      completeIntroHeadlineScroll();
-    }
-  };
-
-  const onResize = () => {
-    if (window.scrollY >= getIntroExitY()) {
-      completeIntroHeadlineScroll();
-    }
-  };
-
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onResize, { passive: true });
-
-  introHeadlineCleanup = () => {
-    window.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onResize);
-    html.classList.remove("intro-scroll-mode");
-    body.classList.remove("intro-scroll-mode");
-    body.classList.add("intro-complete");
-    window.scrollTo(0, 0);
-  };
-}
+let _onPreloaderComplete = null;
 
 function updatePageScrollLock() {
   const isLoading = !!preloaderEl && !preloaderEl.classList.contains("done");
@@ -99,8 +53,8 @@ function hidePreloader() {
   setProgress(100, "Complete");
   setTimeout(() => {
     preloaderEl?.classList.add("done");
-    setupIntroHeadlineScroll();
     updatePageScrollLock();
+    _onPreloaderComplete?.();
   }, 400);
 }
 
@@ -114,7 +68,7 @@ async function init() {
 
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds, setPanelShift, snapPanelShift } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan, getTiltInfo, setTiltTarget, setControlsInteraction, setModelSphere, setCollagePanBounds, snapPanelShift } = createViewer();
 
   renderer.domElement.addEventListener('wheel', (e) => {
     // Non-narrative wheel events are handled by viewer controls directly.
@@ -311,6 +265,11 @@ async function init() {
     const _dissVec = new THREE.Vector3();
     function _tickDissLines() {
       if (!isDissected) { _dissLineRafId = null; return; }
+      // Skip forced-reflow DOM reads while the SVG is hidden during narrative scroll.
+      if (document.body.classList.contains('narrative-scroll-mode')) {
+        _dissLineRafId = requestAnimationFrame(_tickDissLines);
+        return;
+      }
       const rect = renderer.domElement.getBoundingClientRect();
       for (const ann of _annData) {
         ann.sprite.getWorldPosition(_dissVec);
@@ -526,15 +485,11 @@ async function init() {
           return;
         }
         if (name === 'collage') {
-          inNarrative = false;
-          narrativeFree = false;
-          scrollPos = 0;
           currentPhase = -1;
           _currentSubPhase = -1;
           document.body.classList.remove('narrative-mode');
           setNarrativeContent(null);
           closeDetail();
-          backBtn?.classList.add('hidden');
           enableDissectedTilt(false);
           setControlsInteraction(true, true, false);
 
@@ -577,33 +532,14 @@ async function init() {
       document.querySelectorAll('.subnav-item').forEach(item => {
         item.addEventListener('click', () => {
           const name = item.textContent.trim().toLowerCase();
-          const isMapMenu = name === 'map';
-
-          if (!isMapMenu) {
-            startBtn?.classList.add('hidden');
-          } else if (inNarrative) {
-            // Map / brand-mark during narrative = Back button behaviour.
-            closeAllDetails();
-            _exitNarrative();
-            return;
-          } else {
-            startBtn?.classList.remove('hidden');
-          }
-
           _doSwitchMode(name);
         });
       });
 
       document.querySelector('.brand-mark')?.addEventListener('click', (e) => {
         e.preventDefault();
-        if (inNarrative) {
-          closeAllDetails();
-          _exitNarrative();
-        } else {
-          closeAllDetails();
-          startBtn?.classList.remove('hidden');
-          _doSwitchMode('map');
-        }
+        closeAllDetails();
+        _doSwitchMode('map');
       });
 
       // ── Continuous scroll-driven narrative ──────────────────────
@@ -611,15 +547,7 @@ async function init() {
       // Camera theta is a direct linear map of that position.
       // Visual/content changes happen at exactly 1/3 and 2/3.
 
-      const SCROLL_PER_PHASE = 1500; // scroll units per section
-      const TOTAL_SCROLL = SCROLL_PER_PHASE * 4;
-      const EXIT_BACK_THRESH = 400; // how far past 0 before exiting to recorded
-
-      let inNarrative = false;
-      let narrativeFree = false; // at TOTAL_SCROLL: free rotate/pan, scroll locked
-      let scrollPos = 0;
       let currentPhase = -1;
-      let _scrollNarrativeCleanup = null;
 
       function _applyPhase(phase) {
         if (phase === currentPhase) return;
@@ -683,83 +611,29 @@ async function init() {
         }
       }
 
-      function _exitNarrative() {
-        if (_scrollNarrativeCleanup) {
-          _scrollNarrativeCleanup();
-          _scrollNarrativeCleanup = null;
-        }
-        inNarrative = false;
-        narrativeFree = false;
-        scrollPos = 0;
+      // Auto-start the narrative scroll experience once the preloader has faded out.
+      _onPreloaderComplete = () => {
+        closeAllDetails();
         currentPhase = -1;
-        _currentSubPhase = -1;
-        setNarrativeContent(null);
-        backBtn?.classList.add('hidden');
-        // Restore all dataset groups and annotation panels to full visibility.
-        orderedGroups.forEach(g => { if (g) g.visible = true; });
-        for (const ann of _annData) {
-          ann.panel.style.opacity = '';
-          ann.panel.style.pointerEvents = '';
-        }
+        collage.hide();
+        enableCollagePan(false);
+        setControlsInteraction(false, false, false);
         enableDissectedTilt(false);
-        isDissected = false;
-        _currentMode = 'recorded';
-        document.body.classList.remove('collage-mode', 'dissected-mode', 'fatberg-mode', 'narrative-mode');
-        setPanelShift(false);
-        _labelsVisible = true;
-        fadeOverlays(true);
-        if (_triggerMode) _triggerMode(MODE_VISUALS.recorded);
+
+        // Hide anchored scene labels during the scroll experience.
+        _labelsVisible = false;
+        for (const label of sceneLabels) {
+          label.element.style.transition = 'opacity 300ms ease';
+          label.element.style.opacity = '0';
+        }
+        setTimeout(() => { for (const label of sceneLabels) label.visible = false; }, 320);
+
+        // Apply initial phase and camera state.
+        _applyPhase(0);
+        setZoom(homeZoom * (CONFIG.camera.narrativeZoom ?? 0.78));
         goHome();
-        setExplode(explodeGroups.map(() => 0));
-        setZoom(homeZoom);
-        setControlsInteraction(false, false, false); // locked during return animation
-        for (const el of _dissEls) el.style.opacity = '0';
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          for (const img of sceneImages) img.visible = true;
-        }));
-        setAnimOnComplete(() => {
-          setControlsInteraction(true, true, true);
-          startBtn?.classList.remove('hidden');
-        });
-      }
-
-      const backBtn = document.getElementById('back-btn');
-      if (backBtn) {
-        backBtn.addEventListener('click', () => {
-          closeAllDetails();
-          _exitNarrative();
-        });
-      }
-
-      const startBtn = document.getElementById('start-btn');
-      if (startBtn) {
-        startBtn.addEventListener('click', () => {
-          completeIntroHeadlineScroll();
-          closeAllDetails();
-          startBtn.classList.add('hidden');
-          currentPhase = -1;
-
-          collage.hide();
-          enableCollagePan(false);
-          setControlsInteraction(false, false, false);
-          enableDissectedTilt(false);
-
-          // Hide anchored scene labels during the scroll experience.
-          _labelsVisible = false;
-          for (const label of sceneLabels) {
-            label.element.style.transition = 'opacity 300ms ease';
-            label.element.style.opacity = '0';
-          }
-          setTimeout(() => { for (const label of sceneLabels) label.visible = false; }, 320);
-
-          // Apply initial phase and camera state.
-          _applyPhase(0);
-          setZoom(homeZoom * (CONFIG.camera.narrativeZoom ?? 0.78));
-          goHome();
-          _startScrollNarrative();
-        });
-      }
-
+        _startScrollNarrative();
+      };
       function _startScrollNarrative() {
         const SECTIONS = [
           { key: 'phase-0',       phase: 0, subPhase: -1 },
@@ -818,8 +692,6 @@ async function init() {
         const { min: tMin } = getTiltInfo();
         const modelWindows = Array.from(page.querySelectorAll('.narrative-model-window'));
 
-        let narrativeEnded = false;
-
         // Precompute model-window page-offsets so the scroll handler never calls
         // getBoundingClientRect() (which forces layout) on every scroll event.
         let winTops = [];
@@ -834,30 +706,6 @@ async function init() {
         }
         _precompute();
         window.addEventListener('resize', _precompute, { passive: true });
-
-        function _endScrollNarrative() {
-          if (narrativeEnded) return;
-          narrativeEnded = true;
-          // Remove the scroll page and restore normal body behaviour.
-          if (_scrollNarrativeCleanup) {
-            _scrollNarrativeCleanup();
-            _scrollNarrativeCleanup = null;
-          }
-          // Stay in the current phase-3 (remediated) state and hand back controls.
-          backBtn?.classList.remove('hidden');
-          _labelsVisible = true;
-          for (const label of sceneLabels) {
-            label.visible = true;
-            label.element.style.transition = 'opacity 400ms ease';
-            label.element.style.color = MODE_VISUALS.remediated.labelColor;
-            label.element.style.opacity = MODE_VISUALS.remediated.labelOpacity;
-          }
-          goHome();
-          setAnimOnComplete(() => {
-            setControlsInteraction(true, true, false);
-            setTimeout(() => setControlsInteraction(true, true, true), 2000);
-          });
-        }
 
         function onNarrativeScroll() {
           const scrollY = window.scrollY;
@@ -891,88 +739,13 @@ async function init() {
           // Tilt: map overall scroll progress to camera angle.
           const progress = maxScroll > 0 ? Math.min(1, scrollY / maxScroll) : 0;
           setTiltTarget(homeTheta + (tMin - homeTheta) * progress);
-
-          // End the experience once the user has scrolled through the last text block.
-          if (maxScroll > 0 && scrollY >= maxScroll - 4) _endScrollNarrative();
         }
 
         window.addEventListener('scroll', onNarrativeScroll, { passive: true });
         // Apply initial state immediately (scrollY = 0).
         onNarrativeScroll();
-
-        _scrollNarrativeCleanup = () => {
-          window.removeEventListener('scroll', onNarrativeScroll);
-          window.removeEventListener('resize', _precompute);
-          page.remove();
-          if (viewerContainer) viewerContainer.style.transform = '';
-          document.body.classList.remove('narrative-scroll-mode');
-          document.documentElement.style.overflowY = '';
-          document.documentElement.style.height = '';
-          document.body.style.overflowY = '';
-          document.body.style.height = '';
-          window.scrollTo(0, 0);
-        };
       }
 
-      setNarrativeScrollHandler((delta) => {
-        if (!inNarrative) return false;
-
-        // ── Free mode (end of experience): pass scroll to OrbitControls for zoom ──
-        if (narrativeFree) {
-          return false;
-        }
-
-        // ── Scroll-driven tilt ─────────────────────────────────────
-        scrollPos += delta;
-
-        // Backward past start → exit narrative
-        if (scrollPos < -EXIT_BACK_THRESH) {
-          _exitNarrative();
-          return true;
-        }
-
-        // Clamp for theta / phase computation
-        const pos = Math.max(0, Math.min(TOTAL_SCROLL, scrollPos));
-
-        // Map scroll position linearly from default angle → top-down
-        const { min: tMin } = getTiltInfo();
-        setTiltTarget(homeTheta + (tMin - homeTheta) * (pos / TOTAL_SCROLL));
-
-        // Content phase: 0 = all data demo, 1 = dissected, 2 = fatberg, 3 = remediated
-        const phase = pos >= TOTAL_SCROLL ? 3 : Math.floor(pos / SCROLL_PER_PHASE);
-        _applyPhase(phase);
-
-        // Within phase 1: reveal CSO → NPDES → RCRA one at a time.
-        if (phase === 1) {
-          const posInPhase = pos - SCROLL_PER_PHASE;
-          const subIdx = Math.min(2, Math.floor(posInPhase / (SCROLL_PER_PHASE / 3)));
-          _applyDissectedSubPhase(subIdx);
-        }
-
-        // Reached the end → recenter model and enter free rotate/pan mode
-        if (delta > 0 && scrollPos >= TOTAL_SCROLL) {
-          narrativeFree = true;
-          backBtn?.classList.remove('hidden');
-          enableDissectedTilt(false);
-          document.body.classList.remove('narrative-mode');
-          setPanelShift(false);
-          setZoom(homeZoom);
-          _labelsVisible = true;
-          for (const label of sceneLabels) {
-            label.visible = true;
-            label.element.style.transition = 'opacity 400ms ease';
-            label.element.style.color = MODE_VISUALS.remediated.labelColor;
-            label.element.style.opacity = MODE_VISUALS.remediated.labelOpacity;
-          }
-          goHome();
-          setAnimOnComplete(() => {
-            setControlsInteraction(true, true, false);
-            setTimeout(() => setControlsInteraction(true, true, true), 2000);
-          });
-        }
-
-        return true;
-      });
     }
 
     const tickSprites = setupTooltips(getCamera, scene, tooltipEl, modelBox, () => isDissected);

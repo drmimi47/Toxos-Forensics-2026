@@ -131,48 +131,6 @@ body {
   letter-spacing: 0.08em;
 }
 
-.intro-headline-stage {
-  position: relative;
-  z-index: 40;
-  height: 165vh;
-  pointer-events: none;
-}
-
-.intro-headline {
-  position: sticky;
-  top: 50vh;
-  transform: translateY(-50%);
-  width: min(1100px, 88vw);
-  margin: 0 auto;
-  text-align: center;
-  font-family: var(--font-sans);
-  font-size: clamp(1.4rem, 4.4vw, 3.2rem);
-  line-height: 1.12;
-  letter-spacing: 0.01em;
-  font-weight: 600;
-  color: #ffffff;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-  mix-blend-mode: difference;
-}
-
-body.intro-scroll-mode .intro-headline {
-  opacity: 1;
-}
-
-body.intro-complete .intro-headline-stage {
-  display: none;
-}
-
-html.intro-scroll-mode {
-  overflow-y: auto;
-  height: auto;
-}
-
-body.intro-scroll-mode {
-  overflow-y: hidden;
-  height: auto;
-}
 
 .dark-mode-btn {
   background: none;
@@ -1232,39 +1190,6 @@ body.narrative-scroll-mode .diss-panels--left {
   opacity: 1;
 }
 
-/* ── Narrative START button ─────────────────────────────────── */
-.start-btn {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  background: transparent;
-  border: 1px solid #ffffff;
-  box-shadow: inset 0 0 0 0px #ffffff;
-  color: #ffffff;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  padding: 9px 28px;
-  cursor: pointer;
-  pointer-events: all;
-  mix-blend-mode: difference;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-  /* clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px); */
-}
-
-.start-btn:hover {
-  opacity: 0.6;
-}
-
-.start-btn.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(12px);
-}
 
 @media screen and (max-width: 640px) {
   .site-header {
