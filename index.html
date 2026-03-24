@@ -38,6 +38,11 @@
   <!-- Three.js canvas container -->
   <div id="viewer-container" class="viewer-container"></div>
 
+  <!-- Intro headline shown after loading -->
+  <section id="intro-headline-stage" class="intro-headline-stage" aria-hidden="true">
+    <h1 class="intro-headline">We are Exposing Toxicity in New Town Creek</h1>
+  </section>
+
   <!-- Header -->
   <header id="header" class="site-header">
     <a href="#" class="brand-mark">TOXOS<span class="brand-sub">lab</span></a>
@@ -174,11 +179,6 @@
   <!-- Narrative START / BACK buttons -->
   <button id="start-btn" class="start-btn">Start</button>
   <button id="back-btn" class="start-btn hidden">Back</button>
-
-  <!-- Custom overlay scrollbar (driven by narrative progress) -->
-  <div id="page-scrollbar" class="page-scrollbar">
-    <div id="page-scrollbar-thumb" class="page-scrollbar-thumb"></div>
-  </div>
 
   <!-- Entry point -->
   <script type="module" src="./js/main.js"></script>

@@ -8,7 +8,7 @@ import { closeDetail, closeAllDetails, getDetailType } from "./detailPanel.js";
 import { addAllLabels, addAllImages } from "./labels.js";
 import { createCollagePlanes } from "./collage.js";
 import { buildTerrainSnapper } from "./terrainSnap.js";
-import { initNarrativePanel, setNarrativeContent } from "./narrativeText.js";
+import { initNarrativePanel, setNarrativeContent, NARRATIVE_CONTENT } from "./narrativeText.js";
 
 // Per-mode visual settings. Edit these values to retheme each submenu independently.
 // bg:           hex color for the 3D viewport background.
@@ -27,6 +27,54 @@ const MODE_VISUALS = {
 const preloaderEl = document.querySelector(".preloader");
 const preBarEl = document.getElementById("preloader-bar");
 const preTextEl = document.getElementById("preloader-text");
+const introHeadlineStageEl = document.getElementById("intro-headline-stage");
+
+let introHeadlineCleanup = null;
+
+function completeIntroHeadlineScroll() {
+  if (introHeadlineCleanup) {
+    introHeadlineCleanup();
+    introHeadlineCleanup = null;
+  }
+}
+
+function setupIntroHeadlineScroll() {
+  if (!introHeadlineStageEl) return;
+  if (document.body.classList.contains("intro-complete")) return;
+
+  const html = document.documentElement;
+  const body = document.body;
+
+  html.classList.add("intro-scroll-mode");
+  body.classList.add("intro-scroll-mode");
+  window.scrollTo(0, 0);
+
+  const getIntroExitY = () => Math.max(0, introHeadlineStageEl.offsetHeight - window.innerHeight);
+
+  const onScroll = () => {
+    if (window.scrollY >= getIntroExitY()) {
+      completeIntroHeadlineScroll();
+    }
+  };
+
+  const onResize = () => {
+    if (window.scrollY >= getIntroExitY()) {
+      completeIntroHeadlineScroll();
+    }
+  };
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onResize, { passive: true });
+
+  introHeadlineCleanup = () => {
+    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onResize);
+    html.classList.remove("intro-scroll-mode");
+    body.classList.remove("intro-scroll-mode");
+    body.classList.add("intro-complete");
+    window.scrollTo(0, 0);
+  };
+}
 
 function updatePageScrollLock() {
   const isLoading = !!preloaderEl && !preloaderEl.classList.contains("done");
@@ -51,6 +99,7 @@ function hidePreloader() {
   setProgress(100, "Complete");
   setTimeout(() => {
     preloaderEl?.classList.add("done");
+    setupIntroHeadlineScroll();
     updatePageScrollLock();
   }, 400);
 }
@@ -566,21 +615,11 @@ async function init() {
       const TOTAL_SCROLL = SCROLL_PER_PHASE * 4;
       const EXIT_BACK_THRESH = 400; // how far past 0 before exiting to recorded
 
-      const _sbThumb = document.getElementById('page-scrollbar-thumb');
-      const _sbTrack = document.getElementById('page-scrollbar');
-      const _sbThumbH = _sbThumb ? _sbThumb.offsetHeight : 40;
-      function _syncDocumentScrollbar(pos) {
-        if (!_sbThumb || !_sbTrack) return;
-        const clampedPos = Math.max(0, Math.min(TOTAL_SCROLL, pos));
-        const pct = clampedPos / TOTAL_SCROLL;
-        const offset = pct * (_sbTrack.clientHeight - _sbThumbH);
-        _sbThumb.style.transform = `translateY(${offset}px)`;
-      }
-
       let inNarrative = false;
       let narrativeFree = false; // at TOTAL_SCROLL: free rotate/pan, scroll locked
       let scrollPos = 0;
       let currentPhase = -1;
+      let _scrollNarrativeCleanup = null;
 
       function _applyPhase(phase) {
         if (phase === currentPhase) return;
@@ -645,13 +684,16 @@ async function init() {
       }
 
       function _exitNarrative() {
+        if (_scrollNarrativeCleanup) {
+          _scrollNarrativeCleanup();
+          _scrollNarrativeCleanup = null;
+        }
         inNarrative = false;
         narrativeFree = false;
         scrollPos = 0;
         currentPhase = -1;
         _currentSubPhase = -1;
         setNarrativeContent(null);
-        _syncDocumentScrollbar(0);
         backBtn?.classList.add('hidden');
         // Restore all dataset groups and annotation panels to full visibility.
         orderedGroups.forEach(g => { if (g) g.visible = true; });
@@ -692,21 +734,17 @@ async function init() {
       const startBtn = document.getElementById('start-btn');
       if (startBtn) {
         startBtn.addEventListener('click', () => {
+          completeIntroHeadlineScroll();
           closeAllDetails();
           startBtn.classList.add('hidden');
-          inNarrative = true;
-          narrativeFree = false;
-          scrollPos = 0;
           currentPhase = -1;
-          _syncDocumentScrollbar(0);
 
           collage.hide();
           enableCollagePan(false);
           setControlsInteraction(false, false, false);
-          document.body.classList.add('narrative-mode');
-          setPanelShift(true);
+          enableDissectedTilt(false);
 
-          // Hide anchored scene labels during the narrative scroll experience.
+          // Hide anchored scene labels during the scroll experience.
           _labelsVisible = false;
           for (const label of sceneLabels) {
             label.element.style.transition = 'opacity 300ms ease';
@@ -714,14 +752,166 @@ async function init() {
           }
           setTimeout(() => { for (const label of sceneLabels) label.visible = false; }, 320);
 
-          // Apply phase 0: all datasets exploded, no annotation text.
+          // Apply initial phase and camera state.
           _applyPhase(0);
           setZoom(homeZoom * (CONFIG.camera.narrativeZoom ?? 0.78));
-
-          // Reset to default load-in rotation; tilt drives from there toward top-down
           goHome();
-          setAnimOnComplete(() => { enableDissectedTilt(true); });
+          _startScrollNarrative();
         });
+      }
+
+      function _startScrollNarrative() {
+        const SECTIONS = [
+          { key: 'phase-0',       phase: 0, subPhase: -1 },
+          { key: 'phase-1-cso',   phase: 1, subPhase: 0  },
+          { key: 'phase-1-npdes', phase: 1, subPhase: 1  },
+          { key: 'phase-1-rcra',  phase: 1, subPhase: 2  },
+          { key: 'phase-2',       phase: 2, subPhase: -1 },
+          { key: 'phase-3',       phase: 3, subPhase: -1 },
+        ];
+
+        const page = document.createElement('div');
+        page.id = 'narrative-scroll-page';
+        page.className = 'narrative-scroll-page';
+
+        SECTIONS.forEach((sec, i) => {
+          const content = NARRATIVE_CONTENT[sec.key];
+          const section = document.createElement('div');
+          section.className = 'narrative-scroll-section';
+          section.dataset.sectionIdx = String(i);
+
+          const modelWindow = document.createElement('div');
+          modelWindow.className = 'narrative-model-window';
+
+          const textBlock = document.createElement('div');
+          textBlock.className = 'narrative-text-block';
+
+          const card = document.createElement('div');
+          card.className = 'narrative-text-card';
+
+          const h = document.createElement('h2');
+          h.className = 'narrative-heading';
+          h.textContent = content.heading;
+
+          const body = document.createElement('div');
+          body.className = 'narrative-body';
+          body.innerHTML = content.body.map(p => `<p>${p}</p>`).join('');
+
+          card.appendChild(h);
+          card.appendChild(body);
+          textBlock.appendChild(card);
+          section.appendChild(modelWindow);
+          section.appendChild(textBlock);
+          page.appendChild(section);
+        });
+
+        document.body.appendChild(page);
+
+        // Enable native page scroll.
+        document.documentElement.style.overflowY = 'scroll';
+        document.documentElement.style.height = 'auto';
+        document.body.style.overflowY = 'visible';
+        document.body.style.height = 'auto';
+        document.body.classList.add('narrative-scroll-mode');
+
+        const viewerContainer = document.getElementById('viewer-container');
+        const { min: tMin } = getTiltInfo();
+        const modelWindows = Array.from(page.querySelectorAll('.narrative-model-window'));
+
+        let narrativeEnded = false;
+
+        // Precompute model-window page-offsets so the scroll handler never calls
+        // getBoundingClientRect() (which forces layout) on every scroll event.
+        let winTops = [];
+        let maxScroll = 0;
+        function _precompute() {
+          winTops = modelWindows.map(win => {
+            let top = 0, el = win;
+            while (el && el !== document.body) { top += el.offsetTop; el = el.offsetParent; }
+            return top;
+          });
+          maxScroll = Math.max(0, page.scrollHeight - window.innerHeight);
+        }
+        _precompute();
+        window.addEventListener('resize', _precompute, { passive: true });
+
+        function _endScrollNarrative() {
+          if (narrativeEnded) return;
+          narrativeEnded = true;
+          // Remove the scroll page and restore normal body behaviour.
+          if (_scrollNarrativeCleanup) {
+            _scrollNarrativeCleanup();
+            _scrollNarrativeCleanup = null;
+          }
+          // Stay in the current phase-3 (remediated) state and hand back controls.
+          backBtn?.classList.remove('hidden');
+          _labelsVisible = true;
+          for (const label of sceneLabels) {
+            label.visible = true;
+            label.element.style.transition = 'opacity 400ms ease';
+            label.element.style.color = MODE_VISUALS.remediated.labelColor;
+            label.element.style.opacity = MODE_VISUALS.remediated.labelOpacity;
+          }
+          goHome();
+          setAnimOnComplete(() => {
+            setControlsInteraction(true, true, false);
+            setTimeout(() => setControlsInteraction(true, true, true), 2000);
+          });
+        }
+
+        function onNarrativeScroll() {
+          const scrollY = window.scrollY;
+          const vh = window.innerHeight;
+
+          // Find the model window with the most pixels visible — no DOM reads,
+          // uses precomputed winTops offsets.
+          let activeIdx = -1;
+          let bestVisible = -1;
+          for (let i = 0; i < winTops.length; i++) {
+            const top = winTops[i] - scrollY;
+            const vis = Math.min(top + vh, vh) - Math.max(top, 0);
+            if (vis > bestVisible) { bestVisible = vis; activeIdx = i; }
+          }
+
+          if (activeIdx >= 0) {
+            const top = winTops[activeIdx] - scrollY;
+            const isLast = activeIdx === SECTIONS.length - 1;
+
+            // For the last section: once its model window has fully exited above
+            // the viewport, pin the canvas at translateY(0) so the light
+            // remediated model remains visible behind the narrative text.
+            const translateY = (isLast && top + vh <= 0) ? 0 : top;
+            viewerContainer.style.transform = `translateY(${translateY}px)`;
+
+            const sec = SECTIONS[activeIdx];
+            _applyPhase(sec.phase);
+            if (sec.subPhase >= 0) _applyDissectedSubPhase(sec.subPhase);
+          }
+
+          // Tilt: map overall scroll progress to camera angle.
+          const progress = maxScroll > 0 ? Math.min(1, scrollY / maxScroll) : 0;
+          setTiltTarget(homeTheta + (tMin - homeTheta) * progress);
+
+          // End the experience once the user has scrolled through the last text block.
+          if (maxScroll > 0 && scrollY >= maxScroll - 4) _endScrollNarrative();
+        }
+
+        window.addEventListener('scroll', onNarrativeScroll, { passive: true });
+        // Apply initial state immediately (scrollY = 0).
+        onNarrativeScroll();
+
+        _scrollNarrativeCleanup = () => {
+          window.removeEventListener('scroll', onNarrativeScroll);
+          window.removeEventListener('resize', _precompute);
+          page.remove();
+          if (viewerContainer) viewerContainer.style.transform = '';
+          document.body.classList.remove('narrative-scroll-mode');
+          document.documentElement.style.overflowY = '';
+          document.documentElement.style.height = '';
+          document.body.style.overflowY = '';
+          document.body.style.height = '';
+          window.scrollTo(0, 0);
+        };
       }
 
       setNarrativeScrollHandler((delta) => {
@@ -743,7 +933,6 @@ async function init() {
 
         // Clamp for theta / phase computation
         const pos = Math.max(0, Math.min(TOTAL_SCROLL, scrollPos));
-        _syncDocumentScrollbar(pos);
 
         // Map scroll position linearly from default angle → top-down
         const { min: tMin } = getTiltInfo();
@@ -763,7 +952,6 @@ async function init() {
         // Reached the end → recenter model and enter free rotate/pan mode
         if (delta > 0 && scrollPos >= TOTAL_SCROLL) {
           narrativeFree = true;
-          _syncDocumentScrollbar(TOTAL_SCROLL);
           backBtn?.classList.remove('hidden');
           enableDissectedTilt(false);
           document.body.classList.remove('narrative-mode');

@@ -53,31 +53,6 @@ body {
   color: var(--bg-panel-solid);
 }
 
-/* ── Custom overlay scrollbar ─────────────────────────────────────────── */
-.page-scrollbar {
-  position: fixed;
-  right: 0;
-  top: 0;
-  width: 12px;
-  height: 100%;
-  z-index: 500;
-  pointer-events: none;
-  background: rgba(128, 128, 128, 0.15);
-}
-
-.page-scrollbar-thumb {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  min-height: 40px;
-  background: rgba(140, 140, 140, 0.55);
-  border-radius: 999px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-  will-change: transform;
-}
-
 .preloader {
   position: fixed;
   inset: 0;
@@ -154,6 +129,49 @@ body {
   color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.intro-headline-stage {
+  position: relative;
+  z-index: 40;
+  height: 165vh;
+  pointer-events: none;
+}
+
+.intro-headline {
+  position: sticky;
+  top: 50vh;
+  transform: translateY(-50%);
+  width: min(1100px, 88vw);
+  margin: 0 auto;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: clamp(1.4rem, 4.4vw, 3.2rem);
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  mix-blend-mode: difference;
+}
+
+body.intro-scroll-mode .intro-headline {
+  opacity: 1;
+}
+
+body.intro-complete .intro-headline-stage {
+  display: none;
+}
+
+html.intro-scroll-mode {
+  overflow-y: auto;
+  height: auto;
+}
+
+body.intro-scroll-mode {
+  overflow-y: hidden;
+  height: auto;
 }
 
 .dark-mode-btn {
@@ -648,21 +666,22 @@ body {
   margin: 0;
 }
 
-/* ── Narrative right-side text panel ──────────────────────────────────── */
+/* ── Narrative bottom-center text panel ────────────────────────────────── */
 .narrative-panel {
   position: fixed;
-  top: 0;
-  right: 24px;
-  width: 540px;
-  height: 100%;
+  bottom: 80px;
+  left: 50%;
+  width: min(600px, 80vw);
   z-index: 10;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  padding: 80px 0 36px 0;
+  align-items: flex-start;
+  text-align: left;
+  padding: 24px 0;
+  background: transparent;
   pointer-events: none;
   opacity: 0;
-  transform: translateX(16px);
+  transform: translateX(-50%) translateY(16px);
   transition:
     opacity 0.7s cubic-bezier(0.32, 0.72, 0, 1) 0.4s,
     transform 0.7s cubic-bezier(0.32, 0.72, 0, 1) 0.4s;
@@ -670,23 +689,72 @@ body {
 
 body.narrative-mode .narrative-panel {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateX(-50%) translateY(0);
   pointer-events: all;
 }
 
+html.scroll-locked,
 body.scroll-locked {
   overflow: hidden;
-}
-
-body.scroll-locked .page-scrollbar,
-body.collage-mode .page-scrollbar {
-  display: none;
 }
 
 body.collage-mode .narrative-panel,
 body.collage-mode #legend {
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+/* ── Narrative scroll-page mode ────────────────────────────────────────── */
+body.narrative-scroll-mode #viewer-container {
+  position: fixed;
+  will-change: transform;
+}
+
+/* Hide dissected side panels — text lives in the scroll page instead */
+body.narrative-scroll-mode .diss-svg,
+body.narrative-scroll-mode .diss-panels--right,
+body.narrative-scroll-mode .diss-panels--left {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.narrative-scroll-page {
+  position: relative;
+  z-index: 5;
+}
+
+/* 100vh transparent window per phase — canvas shows through from behind */
+.narrative-model-window {
+  height: 100vh;
+  pointer-events: none;
+}
+
+/* Text zone below each model window */
+.narrative-text-block {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  pointer-events: none;
+}
+
+/* Glass card — same aesthetic as .narrative-panel */
+.narrative-text-card {
+  width: min(600px, 80vw);
+  background: transparent;
+  padding: 24px 0;
+  text-align: left;
+  pointer-events: all;
+}
+
+@media (max-width: 640px) {
+  .narrative-text-block {
+    padding: 40px 16px;
+  }
+  .narrative-text-card {
+    padding: 20px 20px;
+  }
 }
 
 /* Content cross-fade on phase change */
