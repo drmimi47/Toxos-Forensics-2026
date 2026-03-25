@@ -54,11 +54,6 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-2a': {
-    heading: 'What is Remediation for Us?',
-    body: [],
-  },
-
   'phase-2': {
     heading: 'Placeholder for Fatberg',
     body: [
@@ -69,6 +64,16 @@ export const NARRATIVE_CONTENT = {
        impedit quo minus id quod maxime placeat facere possimus, omnis voluptas
        assumenda est, omnis dolor repellendus.`,
     ],
+  },
+
+  'phase-2aa': {
+    heading: '<span class="explore-model-trigger" role="button" tabindex="0">Explore Model</span>',
+    body: [],
+  },
+
+  'phase-2a': {
+    heading: 'What is Remediation for Us?',
+    body: [],
   },
 
   'phase-3': {
@@ -83,8 +88,13 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
+  'phase-3a': {
+    heading: '<span class="explore-model-trigger" role="button" tabindex="0">Explore Model</span>',
+    body: [],
+  },
+
   'phase-contact': {
-    heading: 'Toward Remediation',
+    heading: 'Towards Detoxification',
     body: ['<a class="contact-follow-btn" href="https://www.instagram.com/toxos_x/?hl=en" target="_blank" rel="noopener noreferrer">follow</a>'],
   },
 

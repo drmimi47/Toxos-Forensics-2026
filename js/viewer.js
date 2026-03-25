@@ -251,7 +251,7 @@ export function createViewer() {
     let delta = e.deltaY;
     if (e.deltaMode === 1) delta *= 20;
     if (e.deltaMode === 2) delta *= 600;
-    const shouldBlock = _narrativeScrollHandler(delta);
+    const shouldBlock = _narrativeScrollHandler(delta, e);
     if (shouldBlock) {
       e.preventDefault();
       e.stopImmediatePropagation();

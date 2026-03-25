@@ -683,6 +683,12 @@ body.narrative-scroll-mode .diss-panels--left {
   pointer-events: none;
 }
 
+/* Exempt phases keep their full 100vh window */
+[data-section-key="phase--1"] .narrative-model-window,
+[data-section-key="phase-2a"] .narrative-model-window {
+  height: 100vh;
+}
+
 /* Intro section (phase -1): center title card inside the model window */
 .narrative-scroll-section--intro .narrative-model-window {
   display: flex;
@@ -704,8 +710,8 @@ body.narrative-scroll-mode .diss-panels--left {
 
 .contact-follow-btn {
   display: inline-block;
-  border: 1px solid #000000;
-  color: #000000;
+  border: 1px solid var(--text);
+  color: var(--text);
   background: transparent;
   padding: 0.55em 2.2em;
   text-align: center;
@@ -716,17 +722,18 @@ body.narrative-scroll-mode .diss-panels--left {
   text-transform: uppercase;
   cursor: pointer;
   margin-top: 1.75rem;
-  transition: background 200ms ease, color 200ms ease;
+  transition: color 120ms ease, border-color 120ms ease;
 }
 
 .contact-follow-btn:hover {
-  background: #000000;
-  color: #ffffff;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--text) 78%, var(--bg-dark));
+  color: color-mix(in srgb, var(--text) 78%, var(--bg-dark));
 }
 
 /* Text zone below each model window */
 .narrative-text-block {
-  min-height: 40vh;
+  min-height: 20vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -790,6 +797,31 @@ body.narrative-scroll-mode .diss-panels--left {
 .narrative-text-card {
   user-select: text;
   -webkit-user-select: text;
+}
+
+/* ── Explore Model trigger (phase-2aa) ──────────────────────────────────── */
+.explore-model-trigger {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+  text-underline-offset: 8px;
+  transition: text-decoration-color 0.2s;
+}
+.explore-model-trigger:hover,
+.explore-model-trigger:focus-visible {
+  text-decoration-color: #a7ce08;
+  outline: none;
+}
+.explore-mode-active .explore-model-trigger {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.explore-mode-active .narrative-model-window {
+  cursor: grab;
+}
+.explore-mode-active .narrative-model-window:active {
+  cursor: grabbing;
 }
 
 /* ── Credits section (phase-xx) ─────────────────────────────────────────── */
@@ -959,7 +991,7 @@ body.narrative-scroll-mode .diss-panels--left {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
-  justify-content: flex-end;
+  justify-content: space-between;
   pointer-events: none;
 }
 

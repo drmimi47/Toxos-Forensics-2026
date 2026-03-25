@@ -66,7 +66,7 @@ async function init() {
 
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setModelSphere } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere } = createViewer();
 
   renderer.domElement.addEventListener('wheel', (e) => {
     // Non-narrative wheel events are handled by viewer controls directly.
@@ -525,6 +525,8 @@ async function init() {
         [-2]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
         [-3]: { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
         [-4]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
+        [-5]: { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
+        [-6]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
           [0]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: true,  startDissLines: true,  narrativeKey: 'phase-0', dissElsOpacity: '0', sceneImages: true },
           [1]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true },
           [2]: { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-2', dissElsOpacity: '0', sceneImages: null },
@@ -600,8 +602,10 @@ async function init() {
           { key: 'phase-1-npdes', phase: 1, subPhase: 1  },
           { key: 'phase-1-rcra',  phase: 1, subPhase: 2  },
           { key: 'phase-2',       phase: 2,  subPhase: -1 },
+          { key: 'phase-2aa',     phase: -5, subPhase: -1 },
           { key: 'phase-2a',      phase: -2, subPhase: -1 },
           { key: 'phase-3',       phase: 3,  subPhase: -1 },
+          { key: 'phase-3a',      phase: -6, subPhase: -1 },
           { key: 'phase-contact', phase: -4, subPhase: -1 },
           { key: 'phase-xx',      phase: -3, subPhase: -1 },
         ];
@@ -617,6 +621,7 @@ async function init() {
           if (sec.key === 'phase-contact') section.classList.add('narrative-scroll-section--contact');
           if (sec.key === 'phase-xx') section.classList.add('narrative-scroll-section--credits');
           section.dataset.sectionIdx = String(i);
+          section.dataset.sectionKey = sec.key;
 
           const modelWindow = document.createElement('div');
           modelWindow.className = 'narrative-model-window';
@@ -655,6 +660,136 @@ async function init() {
         });
 
         document.body.appendChild(page);
+
+        // ── Explore Model sections (generalized) ──────────────────────────
+        let _exploreActive = false;
+        let _mouseInExplore = false;
+        let _exploreForwardCleanup = null;
+        let _exploreCamSnapshot = null;
+        let _activeExploreSection = null;
+        let _activeExploreMWin = null;
+
+        const _exploreFooterControls = document.querySelector('.footer-controls');
+
+        function activateExplore(section) {
+          if (_exploreActive) return;
+          _exploreActive = true;
+          _activeExploreSection = section;
+          _activeExploreMWin = section.querySelector('.narrative-model-window');
+
+          // Snapshot camera + controls state so we can restore it on deactivate.
+          const cam = getCamera();
+          _exploreCamSnapshot = {
+            position: cam.position.clone(),
+            quaternion: cam.quaternion.clone(),
+            zoom: cam.zoom,
+            target: controls.target.clone(),
+          };
+
+          setControlsInteraction(true, true, true);
+          section.classList.add('explore-mode-active');
+
+          if (_exploreFooterControls) {
+            _exploreFooterControls.style.transition = 'opacity 0.4s';
+            _exploreFooterControls.style.display = 'block';
+            _exploreFooterControls.style.opacity = '0';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              _exploreFooterControls.style.opacity = '1';
+            }));
+          }
+
+          const canvas = renderer.domElement;
+          const mw = _activeExploreMWin;
+          mw.style.pointerEvents = 'auto';
+          mw.style.touchAction = 'none';
+
+          function fwdPointer(e) {
+            e.preventDefault();
+            canvas.dispatchEvent(new PointerEvent(e.type, {
+              pointerId: e.pointerId, pointerType: e.pointerType,
+              clientX: e.clientX, clientY: e.clientY,
+              button: e.button, buttons: e.buttons,
+              pressure: e.pressure, isPrimary: e.isPrimary,
+              bubbles: false, cancelable: true,
+            }));
+          }
+          function fwdWheel(e) {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            canvas.dispatchEvent(new WheelEvent('wheel', {
+              deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ,
+              deltaMode: e.deltaMode,
+              clientX: e.clientX, clientY: e.clientY,
+              ctrlKey: true,
+              bubbles: false,
+            }));
+          }
+
+          mw.addEventListener('pointerdown',   fwdPointer);
+          mw.addEventListener('pointermove',   fwdPointer);
+          mw.addEventListener('pointerup',     fwdPointer);
+          mw.addEventListener('pointercancel', fwdPointer);
+          mw.addEventListener('wheel', fwdWheel, { passive: false });
+
+          _exploreForwardCleanup = () => {
+            mw.removeEventListener('pointerdown',   fwdPointer);
+            mw.removeEventListener('pointermove',   fwdPointer);
+            mw.removeEventListener('pointerup',     fwdPointer);
+            mw.removeEventListener('pointercancel', fwdPointer);
+            mw.removeEventListener('wheel', fwdWheel);
+            mw.style.pointerEvents = '';
+            mw.style.touchAction = '';
+          };
+        }
+
+        function deactivateExplore() {
+          if (!_exploreActive) return;
+          _exploreActive = false;
+          setControlsInteraction(false, false, false);
+          _activeExploreSection?.classList.remove('explore-mode-active');
+          if (_exploreForwardCleanup) { _exploreForwardCleanup(); _exploreForwardCleanup = null; }
+
+          if (_exploreFooterControls) {
+            _exploreFooterControls.style.opacity = '0';
+            setTimeout(() => {
+              _exploreFooterControls.style.display = 'none';
+              _exploreFooterControls.style.transition = '';
+            }, 400);
+          }
+
+          // Restore camera + controls to the state before explore was activated.
+          if (_exploreCamSnapshot) {
+            const cam = getCamera();
+            cam.position.copy(_exploreCamSnapshot.position);
+            cam.quaternion.copy(_exploreCamSnapshot.quaternion);
+            cam.zoom = _exploreCamSnapshot.zoom;
+            cam.updateProjectionMatrix();
+            controls.target.copy(_exploreCamSnapshot.target);
+            controls.update();
+            _exploreCamSnapshot = null;
+          }
+
+          _activeExploreSection = null;
+          _activeExploreMWin = null;
+        }
+
+        // Wire up every section that contains an explore trigger.
+        page.querySelectorAll('.explore-model-trigger').forEach(trigger => {
+          const section = trigger.closest('[data-section-key]');
+          const mw = section?.querySelector('.narrative-model-window');
+          if (!section || !mw) return;
+
+          trigger.addEventListener('click', () => activateExplore(section));
+          trigger.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') activateExplore(section);
+          });
+          mw.addEventListener('pointerenter', () => { if (_activeExploreSection === section) _mouseInExplore = true; });
+          mw.addEventListener('pointerleave', () => { if (_activeExploreSection === section) _mouseInExplore = false; });
+        });
+
+        // Block page scroll only when ctrl+scroll is used inside the active explore window.
+        setNarrativeScrollHandler((_delta, e) => _exploreActive && _mouseInExplore && (e?.ctrlKey ?? false));
 
         // Enable native page scroll.
         document.documentElement.style.overflowY = 'scroll';
@@ -701,7 +836,10 @@ async function init() {
           }
 
           // Hide the canvas on text-only sections (phase < 0); show it for all others.
-          viewerContainer.style.opacity = (activeIdx >= 0 && SECTIONS[activeIdx].phase < 0) ? '0' : '1';
+          // Exception: explore model sections keep the canvas visible.
+          const _activeSec = activeIdx >= 0 ? SECTIONS[activeIdx] : null;
+          const _isExploreSec = _activeSec?.key === 'phase-2aa' || _activeSec?.key === 'phase-3a';
+          viewerContainer.style.opacity = (_activeSec && _activeSec.phase < 0 && !_isExploreSec) ? '0' : '1';
 
           if (activeIdx >= 0) {
             const top = winTops[activeIdx] - scrollY;
@@ -716,6 +854,7 @@ async function init() {
             const sec = SECTIONS[activeIdx];
             _applyPhase(sec.phase);
             if (sec.subPhase >= 0) _applyDissectedSubPhase(sec.subPhase);
+            if (_exploreActive && _activeExploreSection?.dataset.sectionKey !== sec.key) deactivateExplore();
           }
 
           // Tilt: map overall scroll progress to camera angle.
