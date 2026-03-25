@@ -203,7 +203,6 @@ export function createViewer() {
   function handleDoubleActivate() {
     const camera = activeCamera;
     if (document.body.classList.contains('dissected-mode')) return;
-    if (document.body.classList.contains('collage-mode')) return;
     const target = controls.target.clone();
     const dist = camera.position.distanceTo(target);
 
@@ -244,115 +243,7 @@ export function createViewer() {
   renderer.domElement.addEventListener('dblclick', handleDoubleActivate);
   window.addEventListener('double-tap', handleDoubleActivate);
 
-  // ── Collage-mode two-finger trackpad pan ──────────────────────────────────
-  let _collagePanActive = false;
-  let _collagePanBounds = null;
-  function setCollagePanBounds(box) { _collagePanBounds = box; }
-  const COLLAGE_PAN_SPEED = 9;
-
-  function _onCollagePanWheel(e) {
-    if (!_collagePanActive) return;
-    const camera = activeCamera;
-    e.preventDefault();
-    e.stopImmediatePropagation(); // block OrbitControls zoom & tilt handler
-
-    // ctrlKey = trackpad pinch gesture → zoom-to-cursor
-    if (e.ctrlKey) {
-      let delta = e.deltaY;
-      if (e.deltaMode === 1) delta *= 20;
-      if (e.deltaMode === 2) delta *= 300;
-
-      const oldZoom = camera.zoom;
-      const newZoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, oldZoom * Math.pow(0.99, delta)));
-
-      if (newZoom !== oldZoom) {
-        // Cursor in NDC [-1, 1]
-        const rect = renderer.domElement.getBoundingClientRect();
-        const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-        // Pan so the world point under the cursor stays fixed.
-        // When zoom increases, the cursor point moves away from centre in NDC space.
-        // We pan the camera toward the cursor by the exact world-space amount needed
-        // to pull it back: Δworld = right*ndcX*frustumHalfW*(1/oldZoom - 1/newZoom)
-        const zoomShift = 1 / oldZoom - 1 / newZoom; // positive when zooming in
-        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
-        const up    = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-        const pan = new THREE.Vector3()
-          .addScaledVector(right, ndcX * camera.right * zoomShift)
-          .addScaledVector(up,    ndcY * camera.top   * zoomShift);
-
-        camera.position.add(pan);
-        controls.target.add(pan);
-
-        camera.zoom = newZoom;
-        camera.updateProjectionMatrix();
-
-            if (_collagePanBounds) {
-          const clamped = controls.target.clone().clamp(_collagePanBounds.min, _collagePanBounds.max);
-          const correction = clamped.sub(controls.target);
-          controls.target.add(correction);
-          camera.position.add(correction);
-        }
-      }
-      return;
-    }
-
-    const scale = COLLAGE_PAN_SPEED / camera.zoom;
-
-    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
-    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-
-    const panDelta = new THREE.Vector3()
-      .addScaledVector(right, e.deltaX * scale)
-      .addScaledVector(up, -e.deltaY * scale);
-
-    camera.position.add(panDelta);
-    controls.target.add(panDelta);
-
-    if (_collagePanBounds) {
-      const clamped = controls.target.clone().clamp(_collagePanBounds.min, _collagePanBounds.max);
-      const correction = clamped.sub(controls.target);
-      controls.target.add(correction);
-      camera.position.add(correction);
-    }
-  }
-  // Register first so it can stopImmediatePropagation on later handlers
-  renderer.domElement.addEventListener('wheel', _onCollagePanWheel, { passive: false });
-
-  // ── Collage-mode pinch-to-zoom (touch only) ───────────────────────────────
-  let _pinchActive = false;
-  let _pinchStartDist = 0;
-  let _pinchStartZoom = 1;
-
-  function _pinchDist(e) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  renderer.domElement.addEventListener('touchstart', (e) => {
-    if (!_collagePanActive || e.touches.length !== 2) return;
-    _pinchActive = true;
-    _pinchStartDist = _pinchDist(e);
-    _pinchStartZoom = activeCamera.zoom;
-  }, { passive: true });
-
-  renderer.domElement.addEventListener('touchmove', (e) => {
-    if (!_collagePanActive || !_pinchActive || e.touches.length !== 2) return;
-    e.preventDefault();
-    const scale = _pinchDist(e) / _pinchStartDist;
-    activeCamera.zoom = Math.max(controls.minZoom, Math.min(controls.maxZoom, _pinchStartZoom * scale));
-    activeCamera.updateProjectionMatrix();
-  }, { passive: false });
-
-  renderer.domElement.addEventListener('touchend', (e) => {
-    if (e.touches.length < 2) _pinchActive = false;
-  }, { passive: true });
-
-  function enableCollagePan(enable) { _collagePanActive = enable; }
-
-  // ── Narrative scroll handler (runs after collage, before tilt) ──
+  // ── Narrative scroll handler ──────────────────────────────────────────────
   let _narrativeScrollHandler = null;
 
   function _onNarrativeWheel(e) {
@@ -586,25 +477,6 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  function goTopDown(targetZoom) {
-    const camera = activeCamera;
-    if (topDownAnim) topDownAnim.done = true;
-    const target = controls.target.clone();
-    const dist = camera.position.distanceTo(target);
-    const endPos = new THREE.Vector3(target.x, target.y + dist, target.z + 0.1);
-    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 0, -1));
-    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
-    topDownAnim = {
-      startPos: camera.position.clone(), endPos,
-      startQuat: camera.quaternion.clone(), endQuat,
-      startZoom: targetZoom !== undefined ? camera.zoom : undefined,
-      endZoom: targetZoom,
-      target,
-      t0: performance.now(), duration: 800, done: false
-    };
-    controls.enabled = false;
-  }
-
   // Animate to a near-top-down position aligned with the home horizontal direction,
   // so the tilt system's phi matches the isometric axis and the scroll-driven tilt
   // flows continuously from top-down toward the home camera angle.
@@ -661,5 +533,5 @@ export function createViewer() {
     applyPanelToCamera();
   }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, goDissectedTopDown, enableDissectedTilt, enableCollagePan, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setCollagePanBounds, setPanelShift, snapPanelShift };
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift };
 }

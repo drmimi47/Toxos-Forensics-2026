@@ -267,6 +267,7 @@ body {
 }
 
 .legend {
+  display: none;
   position: fixed;
   bottom: 64px;
   left: 0;
@@ -275,11 +276,11 @@ body {
   background: transparent;
 }
 
-:is(.collage-mode, .fatberg-mode, .dissected-mode) .legend {
+:is(.fatberg-mode, .dissected-mode) .legend {
   pointer-events: none;
 }
 
-:is(.collage-mode, .fatberg-mode, .dissected-mode) .legend :is(.legend-title, .legend-dot, .legend-label, .legend-count) {
+:is(.fatberg-mode, .dissected-mode) .legend :is(.legend-title, .legend-dot, .legend-label, .legend-count) {
   opacity: 0;
 }
 
@@ -656,11 +657,6 @@ body.scroll-locked {
   overflow: hidden;
 }
 
-body.collage-mode .narrative-panel,
-body.collage-mode #legend {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
 
 /* ── Narrative scroll-page mode ────────────────────────────────────────── */
 body.narrative-scroll-mode #viewer-container {
@@ -685,6 +681,47 @@ body.narrative-scroll-mode .diss-panels--left {
 .narrative-model-window {
   height: 100vh;
   pointer-events: none;
+}
+
+/* Intro section (phase -1): center title card inside the model window */
+.narrative-scroll-section--intro .narrative-model-window {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 1.5× heading size, centered */
+.narrative-scroll-section--intro .narrative-heading {
+  font-size: 1.875rem;
+  text-align: center;
+}
+
+/* Contact section (phase-contact): 3× heading, left-aligned follow button */
+.narrative-scroll-section--contact .narrative-heading {
+  font-size: 3.75rem;
+  line-height: 1.1;
+}
+
+.contact-follow-btn {
+  display: inline-block;
+  border: 1px solid #000000;
+  color: #000000;
+  background: transparent;
+  padding: 0.55em 2.2em;
+  text-align: center;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 1.75rem;
+  transition: background 200ms ease, color 200ms ease;
+}
+
+.contact-follow-btn:hover {
+  background: #000000;
+  color: #ffffff;
 }
 
 /* Text zone below each model window */
@@ -748,6 +785,76 @@ body.narrative-scroll-mode .diss-panels--left {
 
 .narrative-body p:last-child {
   margin-bottom: 0;
+}
+
+.narrative-text-card {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ── Credits section (phase-xx) ─────────────────────────────────────────── */
+.narrative-scroll-section--credits .narrative-model-window {
+  height: 0;
+}
+
+.narrative-scroll-section--credits .narrative-text-block {
+  padding-top: 80px;
+  padding-bottom: 100px;
+}
+
+.narrative-scroll-section--credits .narrative-text-card {
+  width: min(900px, 90vw);
+  border-top: 1px solid var(--border-bright);
+  padding-top: 48px;
+}
+
+.narrative-scroll-section--credits .narrative-heading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.4;
+  margin-bottom: 40px;
+}
+
+.credits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  margin-bottom: 48px;
+}
+
+.credits-col {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 2;
+  color: var(--text-dim);
+}
+
+.credits-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-top: 0;
+  margin-bottom: 0.4em;
+}
+
+.credits-footnote {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  opacity: 0.45;
+  margin: 0 0 4px;
+}
+
+@media (max-width: 640px) {
+  .credits-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
@@ -847,16 +954,17 @@ body.narrative-scroll-mode .diss-panels--left {
   z-index: 10;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 22px 24px 24px;
   background: var(--bg-panel);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
+  justify-content: flex-end;
   pointer-events: none;
 }
 
 .footer-controls {
+  display: none;
   font-family: var(--font-mono);
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -1146,49 +1254,6 @@ body.narrative-scroll-mode .diss-panels--left {
   display: block;
 }
 
-@keyframes ctrl-disabled-pulse {
-  0% {
-    opacity: 0.38;
-  }
-
-  20% {
-    opacity: 0.92;
-  }
-
-  100% {
-    opacity: 0.38;
-  }
-}
-
-.ctrl-pulse {
-  animation: ctrl-disabled-pulse 0.48s ease-out;
-}
-
-.ctrl-lmb,
-.ctrl-rmb,
-.ctrl-scroll,
-.ctrl-dblclick {
-  transition: opacity 0.3s ease;
-}
-
-:is(.collage-mode, .dissected-mode) .ctrl-lmb {
-  opacity: 0.38;
-}
-
-.dissected-mode .ctrl-rmb,
-.dissected-mode .ctrl-scroll,
-.dissected-mode .ctrl-dblclick {
-  opacity: 0.38;
-}
-
-.ctrl-scroll-tilt {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.dissected-mode .ctrl-scroll-tilt {
-  opacity: 1;
-}
 
 
 @media screen and (max-width: 640px) {

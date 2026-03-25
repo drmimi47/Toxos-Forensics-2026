@@ -6,9 +6,9 @@ import { loadAllCSV } from "./csvLoader.js";
 import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
 import { closeDetail, closeAllDetails, getDetailType } from "./detailPanel.js";
 import { addAllLabels, addAllImages } from "./labels.js";
-import { createCollagePlanes } from "./collage.js";
 import { buildTerrainSnapper } from "./terrainSnap.js";
 import { initNarrativePanel, setNarrativeContent, NARRATIVE_CONTENT } from "./narrativeText.js";
+import { mountPhaseViz } from "./phase-vizdata.js";
 
 // Per-mode visual settings. Edit these values to retheme each submenu independently.
 // bg:           hex color for the 3D viewport background.
@@ -17,11 +17,10 @@ import { initNarrativePanel, setNarrativeContent, NARRATIVE_CONTENT } from "./na
 // labelColor:   hex color for anchored scene text (East River, borough names, etc.).
 // labelOpacity: opacity of the anchored scene text (0–1).
 const MODE_VISUALS = {
-  recorded: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 },
+  recorded:   { bg: '#111111', darkUI: true,  mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 },
   remediated: { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
-  fatberg: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#000000', labelOpacity: 0.75 },
-  collage: { bg: '#eeeeee', darkUI: false, mdT: 1, labelColor: '#000000', labelOpacity: 0.75 },
-  dissected: { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.50 },
+  fatberg:    { bg: '#111111', darkUI: true,  mdT: 0, labelColor: '#000000', labelOpacity: 0.75 },
+  dissected:  { bg: '#111111', darkUI: true,  mdT: 0, labelColor: '#ffffff', labelOpacity: 0.50 },
 };
 
 const preloaderEl = document.querySelector(".preloader");
@@ -32,8 +31,7 @@ let _onPreloaderComplete = null;
 
 function updatePageScrollLock() {
   const isLoading = !!preloaderEl && !preloaderEl.classList.contains("done");
-  const isCollage = document.body.classList.contains("collage-mode");
-  const lock = isLoading || isCollage;
+  const lock = isLoading;
   document.body.classList.toggle("scroll-locked", lock);
   document.documentElement.classList.toggle("scroll-locked", lock);
 }
@@ -68,7 +66,7 @@ async function init() {
 
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goTopDown, enableDissectedTilt, enableCollagePan, getTiltInfo, setTiltTarget, setControlsInteraction, setModelSphere, setCollagePanBounds, snapPanelShift } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setModelSphere } = createViewer();
 
   renderer.domElement.addEventListener('wheel', (e) => {
     // Non-narrative wheel events are handled by viewer controls directly.
@@ -108,15 +106,7 @@ async function init() {
     const _homeOffset = getCamera().position.clone().sub(controls.target);
     const homeTheta = Math.acos(THREE.MathUtils.clamp(_homeOffset.y / _homeOffset.length(), -1, 1));
 
-    {
-      const _sz = new THREE.Vector3();
-      modelBox.getSize(_sz);
-      const _pad = Math.max(_sz.x, _sz.z) * 0.40;
-      setCollagePanBounds(new THREE.Box3(
-        new THREE.Vector3(modelBox.min.x - _pad, modelBox.min.y - 300, modelBox.min.z - _pad),
-        new THREE.Vector3(modelBox.max.x + _pad, modelBox.max.y + 600, modelBox.max.z + _pad),
-      ));
-    }
+
 
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
     const csvResults = await loadAllCSV(scene);
@@ -133,9 +123,6 @@ async function init() {
 
     setProgress(88, "Adding overlay images to scene");
     const sceneImages = addAllImages(scene, getCamera);
-
-    setProgress(91, "Creating collage planes");
-    const collage = createCollagePlanes(scene, modelBox);
 
     if (csvResults.cso) {
       const el = document.getElementById("count-cso");
@@ -457,22 +444,14 @@ async function init() {
 
         enableDissectedTilt(isDissected);
 
-        if (name === 'collage') { collage.show(); } else { collage.hide(); }
-
-        const isCollage = name === 'collage';
-        controls.mouseButtons.LEFT = (isCollage || isDissected) ? null : THREE.MOUSE.ROTATE;
+        controls.mouseButtons.LEFT = isDissected ? null : THREE.MOUSE.ROTATE;
         controls.mouseButtons.RIGHT = isDissected ? null : THREE.MOUSE.PAN;
-        controls.enableZoom = !(isDissected || isCollage);
-        enableCollagePan(isCollage);
-        document.body.classList.toggle('collage-mode', isCollage);
+        controls.enableZoom = !isDissected;
         document.body.classList.toggle('dissected-mode', isDissected);
         document.body.classList.toggle('fatberg-mode', isFatberg);
         updatePageScrollLock();
 
-        document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
-
-        const hideOverlays = isFatberg || isCollage;
-        fadeOverlays(!hideOverlays);
+        fadeOverlays(!isFatberg);
 
         const visuals = MODE_VISUALS[name];
         if (visuals) _triggerMode?.(visuals);
@@ -482,29 +461,6 @@ async function init() {
           setZoom(homeZoom);
           setExplode(explodeGroups.map(() => 0));
           for (const el of _dissEls) el.style.opacity = '0';
-          return;
-        }
-        if (name === 'collage') {
-          currentPhase = -1;
-          _currentSubPhase = -1;
-          document.body.classList.remove('narrative-mode');
-          setNarrativeContent(null);
-          closeDetail();
-          enableDissectedTilt(false);
-          setControlsInteraction(true, true, false);
-
-          snapPanelShift(); // zero frustum shift instantly — prevents panelAnim fighting goTopDown
-          stopZoomTween(true);
-          goTopDown(homeZoom * 0.4);
-          setExplode(explodeGroups.map(() => 0));
-          for (const el of _dissEls) el.style.opacity = '0';
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            for (const label of sceneLabels) {
-              label.element.style.opacity = MODE_VISUALS.collage.labelOpacity;
-              label.element.style.display = '';
-            }
-            for (const img of sceneImages) img.visible = false;
-          }));
           return;
         }
 
@@ -549,64 +505,68 @@ async function init() {
 
       let currentPhase = -1;
 
+      // Declarative model state per narrative phase.
+      // Edit a row here to change which model version/visual state a phase uses.
+      //
+      // mode            – key into MODE_VISUALS (controls bg, texture, dark/light UI)
+      // isDissected     – true while the exploded iso model is the primary view
+      // bodyClass       – CSS class added to <body> for this phase (null = none)
+      // overlays        – whether CSV sprite overlays are visible
+      // explodeStacked  – true = layers spread apart (700ft each), false = collapsed
+      // allGroupsVisible– force all CSV groups visible (phase 0 resets subPhase selection)
+      // startDissLines  – start/continue the SVG dissection-line RAF loop
+      // narrativeKey    – passed to setNarrativeContent; null = scroll card handles text
+      // dissElsOpacity  – opacity for annotation panel elements ('0'|'1'|null=skip)
+      // sceneImages     – show/hide anchored scene images (null = leave unchanged)
+      // NOTE: whenever overlays are visible, data layers are automatically exploded
+      // (stacked 700ft apart). No separate flag needed — overlays drives explosion.
+      const PHASE_MODEL_CONFIG = {
+        [-1]: { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
+        [-2]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
+        [-3]: { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
+        [-4]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
+          [0]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: true,  startDissLines: true,  narrativeKey: 'phase-0', dissElsOpacity: '0', sceneImages: true },
+          [1]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true },
+          [2]: { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-2', dissElsOpacity: '0', sceneImages: null },
+          [3]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: true,  allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-3', dissElsOpacity: '0', sceneImages: true },
+      };
+
       function _applyPhase(phase) {
         if (phase === currentPhase) return;
         currentPhase = phase;
-        document.querySelectorAll('.ctrl-pulse').forEach(el => el.classList.remove('ctrl-pulse'));
 
-        if (phase === 0) {
-          setNarrativeContent('phase-0');
-          // All datasets visible and exploded — pure data demonstration, no annotation text
-          isDissected = true;
-          _currentMode = 'dissected';
-          document.body.classList.remove('fatberg-mode', 'collage-mode');
-          document.body.classList.add('dissected-mode');
-          fadeOverlays(true);
-          if (_triggerMode) _triggerMode(MODE_VISUALS.dissected);
-          orderedGroups.forEach(g => { if (g) g.visible = true; });
-          setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
+        const cfg = PHASE_MODEL_CONFIG[phase];
+        if (!cfg) return;
+
+        if (cfg.narrativeKey) setNarrativeContent(cfg.narrativeKey);
+
+        isDissected = cfg.isDissected;
+        _currentMode = cfg.mode;
+
+        document.body.classList.remove('dissected-mode', 'fatberg-mode');
+        if (cfg.bodyClass) document.body.classList.add(cfg.bodyClass);
+
+        fadeOverlays(cfg.overlays);
+        if (_triggerMode) _triggerMode(MODE_VISUALS[cfg.mode]);
+
+        if (cfg.allGroupsVisible) orderedGroups.forEach(g => { if (g) g.visible = true; });
+
+        // Data layers are always exploded when their overlays are visible.
+        setExplode(cfg.overlays
+          ? explodeGroups.map((_, i) => (i + 1) * 700)
+          : explodeGroups.map(() => 0));
+
+        if (cfg.startDissLines) {
           _currentSubPhase = -1;
           if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
+        }
+
+        if (cfg.dissElsOpacity !== null || cfg.sceneImages !== null) {
           requestAnimationFrame(() => requestAnimationFrame(() => {
-            for (const img of sceneImages) img.visible = true;
-            for (const el of _dissEls) el.style.opacity = '0';
-          }));
-        } else if (phase === 1) {
-          // Dissected sequential reveal: CSO → NPDES → RCRA with annotation panels
-          isDissected = true;
-          _currentMode = 'dissected';
-          document.body.classList.remove('fatberg-mode', 'collage-mode');
-          document.body.classList.add('dissected-mode');
-          fadeOverlays(true);
-          if (_triggerMode) _triggerMode(MODE_VISUALS.dissected);
-          setExplode(explodeGroups.map((_, i) => (i + 1) * 700));
-          _currentSubPhase = -1;
-          if (!_dissLineRafId) _dissLineRafId = requestAnimationFrame(_tickDissLines);
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            for (const img of sceneImages) img.visible = true;
-            for (const el of _dissEls) el.style.opacity = '1';
-          }));
-        } else if (phase === 2) {
-          setNarrativeContent('phase-2');
-          isDissected = false;
-          _currentMode = 'fatberg';
-          document.body.classList.remove('dissected-mode', 'collage-mode');
-          document.body.classList.add('fatberg-mode');
-          fadeOverlays(false);
-          if (_triggerMode) _triggerMode(MODE_VISUALS.fatberg);
-          setExplode(explodeGroups.map(() => 0));
-          for (const el of _dissEls) el.style.opacity = '0';
-        } else if (phase === 3) {
-          setNarrativeContent('phase-3');
-          isDissected = false;
-          _currentMode = 'remediated';
-          document.body.classList.remove('dissected-mode', 'fatberg-mode', 'collage-mode');
-          fadeOverlays(true);
-          if (_triggerMode) _triggerMode(MODE_VISUALS.remediated);
-          setExplode(explodeGroups.map(() => 0));
-          for (const el of _dissEls) el.style.opacity = '0';
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            for (const img of sceneImages) img.visible = true;
+            if (cfg.sceneImages !== null)
+              for (const img of sceneImages) img.visible = cfg.sceneImages;
+            if (cfg.dissElsOpacity !== null)
+              for (const el of _dissEls) el.style.opacity = cfg.dissElsOpacity;
           }));
         }
       }
@@ -615,8 +575,6 @@ async function init() {
       _onPreloaderComplete = () => {
         closeAllDetails();
         currentPhase = -1;
-        collage.hide();
-        enableCollagePan(false);
         setControlsInteraction(false, false, false);
         enableDissectedTilt(false);
 
@@ -629,19 +587,23 @@ async function init() {
         setTimeout(() => { for (const label of sceneLabels) label.visible = false; }, 320);
 
         // Apply initial phase and camera state.
-        _applyPhase(0);
+        _applyPhase(-1);
         setZoom(homeZoom * (CONFIG.camera.narrativeZoom ?? 0.78));
         goHome();
         _startScrollNarrative();
       };
       function _startScrollNarrative() {
         const SECTIONS = [
+          { key: 'phase--1',      phase: -1, subPhase: -1 },
           { key: 'phase-0',       phase: 0, subPhase: -1 },
           { key: 'phase-1-cso',   phase: 1, subPhase: 0  },
           { key: 'phase-1-npdes', phase: 1, subPhase: 1  },
           { key: 'phase-1-rcra',  phase: 1, subPhase: 2  },
-          { key: 'phase-2',       phase: 2, subPhase: -1 },
-          { key: 'phase-3',       phase: 3, subPhase: -1 },
+          { key: 'phase-2',       phase: 2,  subPhase: -1 },
+          { key: 'phase-2a',      phase: -2, subPhase: -1 },
+          { key: 'phase-3',       phase: 3,  subPhase: -1 },
+          { key: 'phase-contact', phase: -4, subPhase: -1 },
+          { key: 'phase-xx',      phase: -3, subPhase: -1 },
         ];
 
         const page = document.createElement('div');
@@ -652,30 +614,43 @@ async function init() {
           const content = NARRATIVE_CONTENT[sec.key];
           const section = document.createElement('div');
           section.className = 'narrative-scroll-section';
+          if (sec.key === 'phase-contact') section.classList.add('narrative-scroll-section--contact');
+          if (sec.key === 'phase-xx') section.classList.add('narrative-scroll-section--credits');
           section.dataset.sectionIdx = String(i);
 
           const modelWindow = document.createElement('div');
           modelWindow.className = 'narrative-model-window';
-
-          const textBlock = document.createElement('div');
-          textBlock.className = 'narrative-text-block';
 
           const card = document.createElement('div');
           card.className = 'narrative-text-card';
 
           const h = document.createElement('h2');
           h.className = 'narrative-heading';
-          h.textContent = content.heading;
-
-          const body = document.createElement('div');
-          body.className = 'narrative-body';
-          body.innerHTML = content.body.map(p => `<p>${p}</p>`).join('');
+          h.innerHTML = content.heading;
 
           card.appendChild(h);
-          card.appendChild(body);
-          textBlock.appendChild(card);
-          section.appendChild(modelWindow);
-          section.appendChild(textBlock);
+
+          if (sec.phase < 0 && content.body.length === 0) {
+            // Heading-only section: card centered inside the model window, no text block below
+            section.classList.add('narrative-scroll-section--intro');
+            modelWindow.appendChild(card);
+            section.appendChild(modelWindow);
+          } else {
+            const body = document.createElement('div');
+            body.className = 'narrative-body';
+            body.innerHTML = sec.key === 'phase-xx'
+              ? content.body.join('')
+              : content.body.map(p => `<p>${p}</p>`).join('');
+            card.appendChild(body);
+            mountPhaseViz(sec.key, card);
+
+            const textBlock = document.createElement('div');
+            textBlock.className = 'narrative-text-block';
+            textBlock.appendChild(card);
+            section.appendChild(modelWindow);
+            section.appendChild(textBlock);
+          }
+
           page.appendChild(section);
         });
 
@@ -689,6 +664,10 @@ async function init() {
         document.body.classList.add('narrative-scroll-mode');
 
         const viewerContainer = document.getElementById('viewer-container');
+        // Hide the canvas initially if the first section is text-only.
+        if (SECTIONS[0].phase < 0) {
+          viewerContainer.style.opacity = '0';
+        }
         const { min: tMin } = getTiltInfo();
         const modelWindows = Array.from(page.querySelectorAll('.narrative-model-window'));
 
@@ -714,12 +693,15 @@ async function init() {
           // Find the model window with the most pixels visible — no DOM reads,
           // uses precomputed winTops offsets.
           let activeIdx = -1;
-          let bestVisible = -1;
+          let bestVisible = -Infinity;
           for (let i = 0; i < winTops.length; i++) {
             const top = winTops[i] - scrollY;
             const vis = Math.min(top + vh, vh) - Math.max(top, 0);
             if (vis > bestVisible) { bestVisible = vis; activeIdx = i; }
           }
+
+          // Hide the canvas on text-only sections (phase < 0); show it for all others.
+          viewerContainer.style.opacity = (activeIdx >= 0 && SECTIONS[activeIdx].phase < 0) ? '0' : '1';
 
           if (activeIdx >= 0) {
             const top = winTops[activeIdx] - scrollY;
@@ -750,33 +732,6 @@ async function init() {
 
     const tickSprites = setupTooltips(getCamera, scene, tooltipEl, modelBox, () => isDissected);
     setTickSprites(tickSprites);
-
-    function pulseCtrl(selector) {
-      const el = document.querySelector(selector);
-      if (!el) return;
-      el.classList.remove('ctrl-pulse');
-      void el.offsetWidth;
-      el.classList.add('ctrl-pulse');
-    }
-
-    const _canvas = renderer.domElement;
-
-    _canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      if (document.body.classList.contains('collage-mode') ||
-        document.body.classList.contains('dissected-mode')) {
-        pulseCtrl('.ctrl-lmb');
-      }
-    });
-
-    _canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 2) return;
-      if (document.body.classList.contains('dissected-mode')) pulseCtrl('.ctrl-rmb');
-    });
-
-    _canvas.addEventListener('dblclick', () => {
-      if (document.body.classList.contains('dissected-mode')) pulseCtrl('.ctrl-dblclick');
-    });
 
     hidePreloader();
 

@@ -2,8 +2,13 @@
 
 export const NARRATIVE_CONTENT = {
 
+  'phase--1': {
+    heading: 'We are Exposing Toxicity in<br>New Town Creek',
+    body: [],
+  },
+
   'phase-0': {
-    heading: "Exposing Toxicity in the Environment",
+    heading: "Title",
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vehicula
        libero at urna pretium, nec ullamcorper justo viverra. Fusce tincidunt
@@ -49,8 +54,13 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
+  'phase-2a': {
+    heading: 'What is Remediation for Us?',
+    body: [],
+  },
+
   'phase-2': {
-    heading: 'Infrastructure Under Pressure',
+    heading: 'Placeholder for Fatberg',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. At vero eos et
        accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium
@@ -62,7 +72,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-3': {
-    heading: 'Toward Remediation',
+    heading: 'Placeholder Title',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in urna
        a turpis vestibulum iaculis. Temporibus autem quibusdam et aut officiis
@@ -70,6 +80,33 @@ export const NARRATIVE_CONTENT = {
       `Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam
        nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas
        nulla pariatur.`,
+    ],
+  },
+
+  'phase-contact': {
+    heading: 'Toward Remediation',
+    body: ['<a class="contact-follow-btn" href="https://www.instagram.com/toxos_x/?hl=en" target="_blank" rel="noopener noreferrer">follow</a>'],
+  },
+
+  'phase-xx': {
+    heading: 'Credits',
+    body: [
+      `<div class="credits-grid">
+        <div class="credits-col">
+          <span class="credits-label">Founders</span>
+          — Shannon Levkovitz<br>— Julio Viejo Romero-Mazariegos<br>— Patrick Rodriguez<br>— Claire Galla<br>— Samantha Nowak
+        </div>
+        <div class="credits-col">
+          <span class="credits-label">Contributors</span>
+          — Benny Yang<br>— Daegeun Kim<br>— Cole Chroman
+        </div>
+        <div class="credits-col">
+          <span class="credits-label">Guest Speakers</span>
+          — Christopher Swain<br>— Mark Wasiuta
+        </div>
+      </div>
+      <p class="credits-footnote">With support from the community of Columbia University GSAPP</p>
+      <p class="credits-footnote">© 2026 TOXOS. All rights reserved.</p>`,
     ],
   },
 
@@ -107,7 +144,7 @@ export function setNarrativeContent(key) {
   // Fade out → swap content → fade in
   _panel.classList.add('narrative-panel--transitioning');
   setTimeout(() => {
-    _heading.textContent = page.heading;
+    _heading.innerHTML = page.heading;
     _body.innerHTML = page.body.map(p => `<p>${p}</p>`).join('');
     _panel.classList.remove('narrative-panel--transitioning');
   }, 200);
