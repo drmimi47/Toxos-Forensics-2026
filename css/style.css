@@ -677,9 +677,9 @@ body.narrative-scroll-mode .diss-panels--left {
   z-index: 5;
 }
 
-/* 100vh transparent window per phase — canvas shows through from behind */
+/* Transparent window per phase — canvas shows through from behind */
 .narrative-model-window {
-  height: 100vh;
+  height: 70vh;
   pointer-events: none;
 }
 
@@ -733,11 +733,11 @@ body.narrative-scroll-mode .diss-panels--left {
 
 /* Text zone below each model window */
 .narrative-text-block {
-  min-height: 20vh;
+  min-height: 10vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 60px 24px;
+  padding: 36px 24px;
   pointer-events: none;
 }
 
@@ -752,7 +752,7 @@ body.narrative-scroll-mode .diss-panels--left {
 
 @media (max-width: 640px) {
   .narrative-text-block {
-    padding: 40px 16px;
+    padding: 24px 16px;
   }
   .narrative-text-card {
     padding: 20px 20px;
@@ -830,8 +830,8 @@ body.narrative-scroll-mode .diss-panels--left {
 }
 
 .narrative-scroll-section--credits .narrative-text-block {
-  padding-top: 80px;
-  padding-bottom: 100px;
+  padding-top: 48px;
+  padding-bottom: 60px;
 }
 
 .narrative-scroll-section--credits .narrative-text-card {

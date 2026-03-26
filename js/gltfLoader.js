@@ -103,6 +103,9 @@ export async function loadModel(scene, onProgress) {
             const posAttr = geom.attributes.position;
             const normalAttr = geom.attributes.normal;
 
+            // Prevent premature pop-out when camera/frustum shifts during scroll.
+            child.frustumCulled = false;
+
             if (!index || !normalAttr) {
               const mat = makeCrossfadeMat();
               child.material = mat;
@@ -136,6 +139,8 @@ export async function loadModel(scene, onProgress) {
             newIndexArray.set(topIndices, 0);
             newIndexArray.set(sideIndices, topIndices.length);
             geom.setIndex(new THREE.BufferAttribute(newIndexArray, 1));
+            geom.computeBoundingBox();
+            geom.computeBoundingSphere();
 
             geom.clearGroups();
             geom.addGroup(0, topIndices.length, 0);
@@ -158,6 +163,7 @@ export async function loadModel(scene, onProgress) {
           }
 
           if (child.isMesh && child.material && !isTopoMesh(child)) {
+            child.frustumCulled = false;
             const materials = Array.isArray(child.material)
               ? child.material
               : [child.material];
