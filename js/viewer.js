@@ -325,6 +325,17 @@ export function createViewer() {
   let _tickSprites = null;
   function setTickSprites(fn) { _tickSprites = fn; }
 
+  // ── Mouse parallax ────────────────────────────────────────────────────────
+  const PARALLAX_MAX = 0.035; // ~2° max tilt
+  const PARALLAX_LERP = 0.05;
+  let _mouseNX = 0, _mouseNY = 0;
+  let _parallaxX = 0, _parallaxY = 0;
+
+  window.addEventListener('mousemove', (e) => {
+    _mouseNX = (e.clientX / window.innerWidth  - 0.5) * 2;
+    _mouseNY = (e.clientY / window.innerHeight - 0.5) * 2;
+  });
+
   function animate() {
     requestAnimationFrame(animate);
 
@@ -408,6 +419,12 @@ export function createViewer() {
       }
       controls.update();
     }
+
+    // Mouse parallax — lerp scene rotation toward normalized mouse position
+    _parallaxX += (_mouseNY *  PARALLAX_MAX - _parallaxX) * PARALLAX_LERP;
+    _parallaxY += (_mouseNX * -PARALLAX_MAX - _parallaxY) * PARALLAX_LERP;
+    scene.rotation.x = _parallaxX;
+    scene.rotation.y = _parallaxY;
 
     if (_tickSprites) _tickSprites();
     renderer.render(scene, camera);
