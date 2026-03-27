@@ -326,10 +326,16 @@ export function createViewer() {
   function setTickSprites(fn) { _tickSprites = fn; }
 
   // ── Mouse parallax ────────────────────────────────────────────────────────
-  const PARALLAX_MAX = 0.035; // ~2° max tilt
+  // Rotates the scene around the camera's own right/up axes so the tilt always
+  // feels screen-aligned: model tips toward the cursor like it's on a screen in front.
+  const PARALLAX_MAX = 0.030; // ~1.7° max tilt
   const PARALLAX_LERP = 0.05;
   let _mouseNX = 0, _mouseNY = 0;
-  let _parallaxX = 0, _parallaxY = 0;
+  let _parallaxH = 0, _parallaxV = 0; // lerped horizontal / vertical offsets
+  const _camRight = new THREE.Vector3();
+  const _camUp    = new THREE.Vector3();
+  const _qH = new THREE.Quaternion();
+  const _qV = new THREE.Quaternion();
 
   window.addEventListener('mousemove', (e) => {
     _mouseNX = (e.clientX / window.innerWidth  - 0.5) * 2;
@@ -420,11 +426,15 @@ export function createViewer() {
       controls.update();
     }
 
-    // Mouse parallax — lerp scene rotation toward normalized mouse position
-    _parallaxX += (_mouseNY *  PARALLAX_MAX - _parallaxX) * PARALLAX_LERP;
-    _parallaxY += (_mouseNX * -PARALLAX_MAX - _parallaxY) * PARALLAX_LERP;
-    scene.rotation.x = _parallaxX;
-    scene.rotation.y = _parallaxY;
+    // Mouse parallax — rotate scene around camera's own right/up axes so the
+    // tilt is always screen-aligned: model tips toward the cursor.
+    _parallaxH += ( _mouseNX * PARALLAX_MAX - _parallaxH) * PARALLAX_LERP;
+    _parallaxV += ( _mouseNY * PARALLAX_MAX - _parallaxV) * PARALLAX_LERP;
+    _camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    _camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    _qH.setFromAxisAngle(_camUp,    _parallaxH);
+    _qV.setFromAxisAngle(_camRight, _parallaxV);
+    scene.quaternion.multiplyQuaternions(_qH, _qV);
 
     if (_tickSprites) _tickSprites();
     renderer.render(scene, camera);

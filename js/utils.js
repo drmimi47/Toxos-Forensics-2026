@@ -34,14 +34,10 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
   _yGeom.setAttribute('position', new THREE.BufferAttribute(_yPos, 3));
   const _crossMat = new THREE.LineBasicMaterial({
     color: 0xffffff,
-    transparent: true,
     toneMapped: false,
     depthTest: false,
     depthWrite: false,
-    blending: THREE.CustomBlending,
-    blendEquation: THREE.AddEquation,
-    blendSrc: THREE.OneMinusDstColorFactor,
-    blendDst: THREE.ZeroFactor,
+    blending: THREE.NormalBlending,
   });
   const _xLine = new THREE.Line(_xGeom, _crossMat);
   const _zLine = new THREE.Line(_zGeom, _crossMat);
@@ -284,7 +280,7 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
         _zPos[3] = wp.x; _zPos[4] = wp.y; _zPos[5] = modelBox.max.z;
         _zGeom.attributes.position.needsUpdate = true;
         _yPos[0] = wp.x; _yPos[1] = wp.y; _yPos[2] = wp.z;
-        _yPos[3] = wp.x; _yPos[4] = modelBox.min.y; _yPos[5] = wp.z;
+        _yPos[3] = wp.x; _yPos[4] = wp.y; _yPos[5] = wp.z;
         _yGeom.attributes.position.needsUpdate = true;
         _crossTarget = CROSS_OPACITY;
       } else {
