@@ -22,30 +22,26 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
   let hoveredSprite = null;
   let selectedSprite = null;
 
-  // Crosshair lines shown in DISSECTED mode — inversion blending inverts whatever is underneath
-  const _xPos = new Float32Array(6);
-  const _zPos = new Float32Array(6);
-  const _yPos = new Float32Array(6);
-  const _xGeom = new THREE.BufferGeometry();
-  const _zGeom = new THREE.BufferGeometry();
-  const _yGeom = new THREE.BufferGeometry();
-  _xGeom.setAttribute('position', new THREE.BufferAttribute(_xPos, 3));
-  _zGeom.setAttribute('position', new THREE.BufferAttribute(_zPos, 3));
-  _yGeom.setAttribute('position', new THREE.BufferAttribute(_yPos, 3));
-  const _crossMat = new THREE.LineBasicMaterial({
-    color: 0xffffff,
-    toneMapped: false,
-    depthTest: false,
-    depthWrite: false,
-    blending: THREE.NormalBlending,
+  // Crosshair lines shown in DISSECTED mode — SVG overlay for crisp 1px lines
+  const _crossSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  _crossSvg.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:900;overflow:visible;';
+  document.body.appendChild(_crossSvg);
+  const _svgLineX = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  const _svgLineZ = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  [_svgLineX, _svgLineZ].forEach(l => {
+    l.setAttribute('stroke', '#ffffff');
+    l.setAttribute('stroke-width', '1');
+    l.setAttribute('shape-rendering', 'crispEdges');
+    _crossSvg.appendChild(l);
   });
-  const _xLine = new THREE.Line(_xGeom, _crossMat);
-  const _zLine = new THREE.Line(_zGeom, _crossMat);
-  const _yLine = new THREE.Line(_yGeom, _crossMat);
-  _xLine.renderOrder = 1002;
-  _zLine.renderOrder = 1002;
-  _yLine.renderOrder = 1002;
-  scene.add(_xLine, _zLine, _yLine);
+
+  // Reusable vector for projecting 3D endpoints to screen space
+  const _cpA = new THREE.Vector3();
+
+  // Scene-local 3D endpoints for each line (set on hover, projected each tick)
+  const _crossX = { ax: 0, ay: 25, az: 0, bx: 0, by: 25, bz: 0 };
+  const _crossZ = { ax: 0, ay: 25, az: 0, bx: 0, by: 25, bz: 0 };
+
   let _crossTarget = 0;
   const CROSS_OPACITY = 1;
 
@@ -88,6 +84,7 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
     if (selectedSprite && _selClone && _selOriginal) {
       selectedSprite.material = _selOriginal;
       selectedSprite.renderOrder = 999;
+      animating.add(selectedSprite);
       opacityTargets.delete(_selClone);
       _selClone.dispose();
       document.querySelectorAll('.scene-image').forEach(el => { el.style.opacity = ''; el.style.pointerEvents = ''; });
@@ -201,9 +198,32 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
       }
     }
 
-    _xLine.visible = _crossTarget > 0;
-    _zLine.visible = _crossTarget > 0;
-    _yLine.visible = _crossTarget > 0;
+    // Project crosshair endpoints to screen and update SVG lines
+    if (_crossTarget > 0) {
+      const camera = typeof getCamera === 'function' ? getCamera() : getCamera;
+      const canvas = document.querySelector('#viewer-container canvas');
+      const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+      const cw = rect.width, ch = rect.height, cl = rect.left, ct = rect.top;
+
+      function project(x, y, z) {
+        _cpA.set(x, y, z).applyMatrix4(scene.matrixWorld).project(camera);
+        return { x: (_cpA.x + 1) / 2 * cw + cl, y: (1 - _cpA.y) / 2 * ch + ct };
+      }
+
+      const xA = project(_crossX.ax, _crossX.ay, _crossX.az);
+      const xB = project(_crossX.bx, _crossX.by, _crossX.bz);
+      _svgLineX.setAttribute('x1', xA.x); _svgLineX.setAttribute('y1', xA.y);
+      _svgLineX.setAttribute('x2', xB.x); _svgLineX.setAttribute('y2', xB.y);
+
+      const zA = project(_crossZ.ax, _crossZ.ay, _crossZ.az);
+      const zB = project(_crossZ.bx, _crossZ.by, _crossZ.bz);
+      _svgLineZ.setAttribute('x1', zA.x); _svgLineZ.setAttribute('y1', zA.y);
+      _svgLineZ.setAttribute('x2', zB.x); _svgLineZ.setAttribute('y2', zB.y);
+
+      _crossSvg.style.display = '';
+    } else {
+      _crossSvg.style.display = 'none';
+    }
   }
 
   const viewerCanvas = document.querySelector('#viewer-container canvas');
@@ -273,15 +293,11 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
       if (modelBox && getDissected?.()) {
         const wp = new THREE.Vector3();
         hit.object.getWorldPosition(wp);
-        _xPos[0] = modelBox.min.x; _xPos[1] = wp.y; _xPos[2] = wp.z;
-        _xPos[3] = modelBox.max.x; _xPos[4] = wp.y; _xPos[5] = wp.z;
-        _xGeom.attributes.position.needsUpdate = true;
-        _zPos[0] = wp.x; _zPos[1] = wp.y; _zPos[2] = modelBox.min.z;
-        _zPos[3] = wp.x; _zPos[4] = wp.y; _zPos[5] = modelBox.max.z;
-        _zGeom.attributes.position.needsUpdate = true;
-        _yPos[0] = wp.x; _yPos[1] = wp.y; _yPos[2] = wp.z;
-        _yPos[3] = wp.x; _yPos[4] = wp.y; _yPos[5] = wp.z;
-        _yGeom.attributes.position.needsUpdate = true;
+        scene.worldToLocal(wp);
+        _crossX.ax = modelBox.min.x; _crossX.ay = wp.y; _crossX.az = wp.z;
+        _crossX.bx = modelBox.max.x; _crossX.by = wp.y; _crossX.bz = wp.z;
+        _crossZ.ax = wp.x; _crossZ.ay = wp.y; _crossZ.az = modelBox.min.z;
+        _crossZ.bx = wp.x; _crossZ.by = wp.y; _crossZ.bz = modelBox.max.z;
         _crossTarget = CROSS_OPACITY;
       } else {
         _crossTarget = 0;
