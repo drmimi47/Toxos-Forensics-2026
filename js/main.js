@@ -66,7 +66,7 @@ async function init() {
 
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere } = createViewer();
 
   renderer.domElement.addEventListener('wheel', (e) => {
     // Non-narrative wheel events are handled by viewer controls directly.
@@ -99,6 +99,7 @@ async function init() {
       setModelSphere(_sphere.radius, CONFIG.camera.initialZoom ?? 0.80);
     }
     setHomeState(getCamera().position, controls.target);
+    goDissectedTopDown(); // run top-down animation during load so it's done before preloader fades
     const homeZoom = getCamera().zoom;
 
     // Capture the polar angle of the default load-in camera position.
@@ -283,7 +284,7 @@ async function init() {
         csvResults.rcra_2263_clipped?.group,
       ].filter(Boolean).sort((a, b) => b.children.length - a.children.length);
 
-      // Fixed CSO → NPDES → RCRA order for the sequential reveal in phase 0.
+      // Fixed CSO → NPDES → RCRA order for the sequential reveal in phase 2.
       const orderedGroups = [
         csvResults.cso?.group,
         csvResults.npdes?.group,
@@ -291,14 +292,20 @@ async function init() {
       ].filter(Boolean);
 
       let _currentSubPhase = -1;
+      let _subFadeToken = 0;
+      const SUBFADE_MS = 220;
 
-      const _subPhaseKeys = ['phase-1-cso', 'phase-1-npdes', 'phase-1-rcra'];
+      const _subPhaseKeys = ['phase-2-a', 'phase-2-b', 'phase-2-c'];
 
-      function _applyDissectedSubPhase(idx) {
-        if (idx === _currentSubPhase) return;
-        _currentSubPhase = idx;
+      // Ordered parallel to orderedGroups: one material per CSV dataset.
+      const orderedMaterials = [
+        csvResults.cso?.material,
+        csvResults.npdes?.material,
+        csvResults.rcra_2263_clipped?.material,
+      ].filter(Boolean);
+
+      function _switchSubPhaseAnnotations(idx) {
         setNarrativeContent(_subPhaseKeys[idx]);
-        orderedGroups.forEach((g, i) => { if (g) g.visible = (i === idx); });
         for (const ann of _annData) {
           const active = ann.dataGroup === orderedGroups[idx];
           ann.svgLine.setAttribute('stroke-opacity', active ? '0.7' : '0');
@@ -308,27 +315,112 @@ async function init() {
         }
       }
 
+      function _applyDissectedSubPhase(idx) {
+        if (idx === _currentSubPhase) return;
+        _currentSubPhase = idx;
+        const token = ++_subFadeToken;
+
+        // Take material-opacity control away from any running fadeOverlays animation.
+        ++_fadeCancelToken;
+        if (_fadeRafId) { cancelAnimationFrame(_fadeRafId); _fadeRafId = null; }
+
+        const nextMat = orderedMaterials[idx];
+        const nextAlreadyFull = nextMat ? nextMat.opacity >= 0.99 : false;
+
+        // Collect every non-target material that has visible opacity to fade out.
+        const fadeOutIndices = [];
+        const fadeOutStartOps = [];
+        for (let i = 0; i < orderedMaterials.length; i++) {
+          if (i === idx) continue;
+          const m = orderedMaterials[i];
+          if (m && m.opacity > 0.001) {
+            fadeOutIndices.push(i);
+            fadeOutStartOps.push(m.opacity);
+          } else {
+            // Already invisible — hide group immediately.
+            if (m) { m.opacity = 0; m.needsUpdate = true; }
+            if (orderedGroups[i]) orderedGroups[i].visible = false;
+          }
+        }
+
+        // Make target group visible. Only reset to 0 if it isn't already showing.
+        if (orderedGroups[idx]) orderedGroups[idx].visible = true;
+        if (!nextAlreadyFull && nextMat) { nextMat.opacity = 0; nextMat.needsUpdate = true; }
+
+        const hasFadeOut = fadeOutIndices.length > 0;
+        const hasFadeIn  = !nextAlreadyFull;
+        const totalMs    = (hasFadeOut ? SUBFADE_MS : 0) + (hasFadeIn ? SUBFADE_MS : 0);
+
+        // Switch narrative + annotations at the crossover (when fade-out ends).
+        if (!hasFadeOut) {
+          _switchSubPhaseAnnotations(idx);
+        } else {
+          setTimeout(() => {
+            if (_subFadeToken === token) _switchSubPhaseAnnotations(idx);
+          }, SUBFADE_MS);
+        }
+
+        if (totalMs === 0) return;
+
+        const t0 = performance.now();
+
+        function tick() {
+          if (_subFadeToken !== token) return;
+          const elapsed = performance.now() - t0;
+
+          // Fade out all non-target materials in parallel.
+          if (hasFadeOut) {
+            const p = Math.min(elapsed / SUBFADE_MS, 1);
+            fadeOutIndices.forEach((i, j) => {
+              const m = orderedMaterials[i];
+              if (!m) return;
+              m.opacity = fadeOutStartOps[j] * (1 - p);
+              m.needsUpdate = true;
+              if (p >= 1 && orderedGroups[i]) orderedGroups[i].visible = false;
+            });
+          }
+
+          // Fade in target material (starts immediately after fade-out).
+          if (hasFadeIn) {
+            const offset = hasFadeOut ? SUBFADE_MS : 0;
+            const p = Math.min(Math.max(elapsed - offset, 0) / SUBFADE_MS, 1);
+            if (nextMat) { nextMat.opacity = p; nextMat.needsUpdate = true; }
+          }
+
+          if (elapsed < totalMs) requestAnimationFrame(tick);
+        }
+
+        requestAnimationFrame(tick);
+      }
+
       const targetY = explodeGroups.map(() => 0);
       let rafId = null;
 
-      function tickGroupY() {
-        let settling = false;
-        explodeGroups.forEach((g, i) => {
-          const next = THREE.MathUtils.lerp(g.position.y, targetY[i], 0.1);
-          if (Math.abs(next - targetY[i]) < 0.5) {
-            g.position.y = targetY[i];
-          } else {
-            g.position.y = next;
-            settling = true;
-          }
-        });
-        rafId = settling ? requestAnimationFrame(tickGroupY) : null;
-      }
-
       function setExplode(offsets) {
+        const startYs = explodeGroups.map(g => g.position.y);
         offsets.forEach((y, i) => { targetY[i] = y; });
-        if (rafId) cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(tickGroupY);
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+
+        // Net upward movement → ease-in (accelerate out).
+        // Net downward movement → ease-out (decelerate in).
+        const totalDelta = offsets.reduce((sum, y, i) => sum + (y - startYs[i]), 0);
+        const easeFn = totalDelta > 0
+          ? p => p * p * p            // cubic ease-in
+          : p => 1 - Math.pow(1 - p, 3);     // cubic ease-out
+        const DURATION = 900;       
+
+        const t0 = performance.now();
+
+        function tick() {
+          const p = Math.min((performance.now() - t0) / DURATION, 1);
+          const ep = easeFn(p);
+          explodeGroups.forEach((g, i) => {
+            g.position.y = startYs[i] + (targetY[i] - startYs[i]) * ep;
+          });
+          rafId = p < 1 ? requestAnimationFrame(tick) : null;
+        }
+
+        rafId = requestAnimationFrame(tick);
       }
 
       let zoomTarget = homeZoom;
@@ -401,18 +493,24 @@ async function init() {
 
         if (toVisible) {
           for (const g of csvGroups) g.visible = true;
-          for (const m of materials) { m.opacity = 0; m.needsUpdate = true; }
+          // Only reset materials that aren't already fully visible (e.g. coming from a subphase).
+          for (const m of materials) { if (m.opacity < 1) { m.opacity = 0; m.needsUpdate = true; } }
         }
 
-        const startOp = toVisible ? 0 : 1;
+        // Capture per-material start opacities so each fades from its own current value.
+        const startOps = materials.map(m => m.opacity);
         const endOp = toVisible ? 1 : 0;
         const t0 = performance.now();
 
         function tick() {
           if (_fadeCancelToken !== token) return;
           const p = Math.min((performance.now() - t0) / FADE_MS, 1);
-          const op = startOp + (endOp - startOp) * p;
-          for (const m of materials) { m.opacity = op; m.needsUpdate = true; }
+          for (let i = 0; i < materials.length; i++) {
+            const m = materials[i];
+            if (toVisible && m.opacity >= 1) continue; // already at max — leave it alone
+            m.opacity = startOps[i] + (endOp - startOps[i]) * p;
+            m.needsUpdate = true;
+          }
           if (p < 1) {
             _fadeRafId = requestAnimationFrame(tick);
           } else {
@@ -503,7 +601,7 @@ async function init() {
       // Camera theta is a direct linear map of that position.
       // Visual/content changes happen at exactly 1/3 and 2/3.
 
-      let currentPhase = -1;
+      let currentPhase = null;
 
       // Declarative model state per narrative phase.
       // Edit a row here to change which model version/visual state a phase uses.
@@ -513,7 +611,7 @@ async function init() {
       // bodyClass       – CSS class added to <body> for this phase (null = none)
       // overlays        – whether CSV sprite overlays are visible
       // explodeStacked  – true = layers spread apart (700ft each), false = collapsed
-      // allGroupsVisible– force all CSV groups visible (phase 0 resets subPhase selection)
+      // allGroupsVisible– force all CSV groups visible (phase 3 resets subPhase selection)
       // startDissLines  – start/continue the SVG dissection-line RAF loop
       // narrativeKey    – passed to setNarrativeContent; null = scroll card handles text
       // dissElsOpacity  – opacity for annotation panel elements ('0'|'1'|null=skip)
@@ -521,20 +619,20 @@ async function init() {
       // NOTE: whenever overlays are visible, data layers are automatically exploded
       // (stacked 700ft apart). No separate flag needed — overlays drives explosion.
       const PHASE_MODEL_CONFIG = {
-        [-1]: { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
-        [-2]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
-        [-3]: { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
-        [-4]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
-        [-5]: { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
-        [-6]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null },
-          [0]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: true,  startDissLines: true,  narrativeKey: 'phase-0', dissElsOpacity: '0', sceneImages: true },
-          [1]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true },
-          [2]: { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-2', dissElsOpacity: '0', sceneImages: null },
-          [3]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: true,  allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-3', dissElsOpacity: '0', sceneImages: true },
+        [0]:  { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
+        [1]:  { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: false },
+        [2]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true  },
+        [3]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: true,  startDissLines: true,  narrativeKey: 'phase-3', dissElsOpacity: '0', sceneImages: true  },
+        [4]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-4', dissElsOpacity: '0', sceneImages: null  },
+        [5]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
+        [6]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
+        [7]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: true,  allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7', dissElsOpacity: '0', sceneImages: true  },
+        [8]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
       };
 
       function _applyPhase(phase) {
         if (phase === currentPhase) return;
+        const prevPhase = currentPhase;
         currentPhase = phase;
 
         const cfg = PHASE_MODEL_CONFIG[phase];
@@ -553,10 +651,28 @@ async function init() {
 
         if (cfg.allGroupsVisible) orderedGroups.forEach(g => { if (g) g.visible = true; });
 
-        // Data layers are always exploded when their overlays are visible.
-        setExplode(cfg.overlays
-          ? explodeGroups.map((_, i) => (i + 1) * 700)
-          : explodeGroups.map(() => 0));
+        if (phase === 3) {
+          // Snap to stacked heights when coming from an elevated state or from phase 4
+          // (so groups fly down into view). Skip snap when coming from phase 2 (already at ground).
+          if (targetY.some(y => y > 10) || prevPhase === 4) {
+            explodeGroups.forEach((g, i) => { g.position.y = (i + 1) * 700; targetY[i] = (i + 1) * 700; });
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+          }
+          setExplode(explodeGroups.map(() => 0));
+        } else if (phase === 2) {
+          // Sub-phases (CSO/NPDES/RCRA): keep all data points at ground level.
+          setExplode(explodeGroups.map(() => 0));
+        } else if (phase === 4) {
+          // Coming from phase 3: fly datasets up to stacked heights as they fade out.
+          // Any other direction: collapse to ground.
+          setExplode(prevPhase === 3
+            ? explodeGroups.map((_, i) => (i + 1) * 700)
+            : explodeGroups.map(() => 0));
+        } else {
+          setExplode(cfg.overlays
+            ? explodeGroups.map((_, i) => (i + 1) * 700)
+            : explodeGroups.map(() => 0));
+        }
 
         if (cfg.startDissLines) {
           _currentSubPhase = -1;
@@ -571,12 +687,16 @@ async function init() {
               for (const el of _dissEls) el.style.opacity = cfg.dissElsOpacity;
           }));
         }
+
+        // Camera transitions for the opening sequence.
+        if (phase === 0) goDissectedTopDown(); // title: top-down view
+        if (phase === 1) goHome();             // blank model: animate to home pose
       }
 
       // Auto-start the narrative scroll experience once the preloader has faded out.
       _onPreloaderComplete = () => {
         closeAllDetails();
-        currentPhase = -1;
+        currentPhase = null;
         setControlsInteraction(false, false, false);
         enableDissectedTilt(false);
 
@@ -591,23 +711,21 @@ async function init() {
         // Apply initial phase and camera state.
         _applyPhase(-1);
         setZoom(homeZoom * (CONFIG.camera.narrativeZoom ?? 0.78));
-        goHome();
         _startScrollNarrative();
       };
       function _startScrollNarrative() {
         const SECTIONS = [
-          { key: 'phase--1',      phase: -1, subPhase: -1 },
-          { key: 'phase-0',       phase: 0, subPhase: -1 },
-          { key: 'phase-1-cso',   phase: 1, subPhase: 0  },
-          { key: 'phase-1-npdes', phase: 1, subPhase: 1  },
-          { key: 'phase-1-rcra',  phase: 1, subPhase: 2  },
-          { key: 'phase-2',       phase: 2,  subPhase: -1 },
-          { key: 'phase-2aa',     phase: -5, subPhase: -1 },
-          { key: 'phase-2a',      phase: -2, subPhase: -1 },
-          { key: 'phase-3',       phase: 3,  subPhase: -1 },
-          { key: 'phase-3a',      phase: -6, subPhase: -1 },
-          { key: 'phase-contact', phase: -4, subPhase: -1 },
-          { key: 'phase-xx',      phase: -3, subPhase: -1 },
+          { key: 'phase-0',   phase: 0  }, //title
+          { key: 'phase-1',   phase: 1  }, //context
+          { key: 'phase-2-a', phase: 2, subPhase: 0 }, //CSO
+          { key: 'phase-2-b', phase: 2, subPhase: 1 }, //NPDES
+          { key: 'phase-2-c', phase: 2, subPhase: 2 }, //RCRA
+          { key: 'phase-3',   phase: 3  }, //all groups
+          { key: 'phase-4',   phase: 4  }, //Fatberg
+          { key: 'phase-5',   phase: 5  }, //Explore Model
+          { key: 'phase-6',   phase: 6  }, //Title
+          { key: 'phase-7',   phase: 7  }, //Remediation
+          { key: 'phase-8',   phase: 8  }, //Explore Model
         ];
 
         const page = document.createElement('div');
@@ -618,10 +736,14 @@ async function init() {
           const content = NARRATIVE_CONTENT[sec.key];
           const section = document.createElement('div');
           section.className = 'narrative-scroll-section';
-          if (sec.key === 'phase-contact') section.classList.add('narrative-scroll-section--contact');
-          if (sec.key === 'phase-xx') section.classList.add('narrative-scroll-section--credits');
           section.dataset.sectionIdx = String(i);
           section.dataset.sectionKey = sec.key;
+
+          const debugLabel = document.createElement('div');
+          debugLabel.textContent = sec.key;
+          debugLabel.style.cssText = 'position:absolute;top:8px;left:12px;font-family:monospace;font-size:11px;color:rgba(255,255,255,0.5);z-index:999;pointer-events:none;';
+          section.style.position = 'relative';
+          section.appendChild(debugLabel);
 
           const modelWindow = document.createElement('div');
           modelWindow.className = 'narrative-model-window';
@@ -635,7 +757,7 @@ async function init() {
 
           card.appendChild(h);
 
-          if (sec.phase < 0 && content.body.length === 0) {
+          if (content.body.length === 0) {
             // Heading-only section: card centered inside the model window, no text block below
             section.classList.add('narrative-scroll-section--intro');
             modelWindow.appendChild(card);
@@ -643,9 +765,7 @@ async function init() {
           } else {
             const body = document.createElement('div');
             body.className = 'narrative-body';
-            body.innerHTML = sec.key === 'phase-xx'
-              ? content.body.join('')
-              : content.body.map(p => `<p>${p}</p>`).join('');
+            body.innerHTML = content.body.map(p => `<p>${p}</p>`).join('');
             card.appendChild(body);
             mountPhaseViz(sec.key, card);
 
@@ -660,6 +780,38 @@ async function init() {
         });
 
         document.body.appendChild(page);
+
+        // ── Page footer (contact + credits — not a scroll phase) ──────────
+        const narrativeFooter = document.createElement('footer');
+        narrativeFooter.className = 'narrative-footer';
+        narrativeFooter.innerHTML = `
+          <div class="narrative-footer__inner">
+            <div class="narrative-footer__contact">
+              <h2 class="narrative-footer__contact-heading">Towards Detoxification</h2>
+              <a class="contact-follow-btn" href="https://www.instagram.com/toxos_x/?hl=en" target="_blank" rel="noopener noreferrer">follow</a>
+            </div>
+            <div class="narrative-footer__credits">
+              <p class="narrative-footer__credits-label">Credits</p>
+              <div class="credits-grid">
+                <div class="credits-col">
+                  <span class="credits-label">Founders</span>
+                  — Shannon Levkovitz<br>— Julio Viejo Romero-Mazariegos<br>— Patrick Rodriguez<br>— Claire Galla<br>— Samantha Nowak
+                </div>
+                <div class="credits-col">
+                  <span class="credits-label">Contributors</span>
+                  — Benny Yang<br>— Daegeun Kim<br>— Cole Chroman
+                </div>
+                <div class="credits-col">
+                  <span class="credits-label">Guest Speakers</span>
+                  — Christopher Swain<br>— Mark Wasiuta
+                </div>
+              </div>
+              <p class="credits-footnote">With support from the community of Columbia University GSAPP</p>
+              <p class="credits-footnote">© 2026 TOXOS. All rights reserved.</p>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(narrativeFooter);
 
         // ── Explore Model sections (generalized) ──────────────────────────
         let _exploreActive = false;
@@ -799,10 +951,8 @@ async function init() {
         document.body.classList.add('narrative-scroll-mode');
 
         const viewerContainer = document.getElementById('viewer-container');
-        // Hide the canvas initially if the first section is text-only.
-        if (SECTIONS[0].phase < 0) {
-          viewerContainer.style.opacity = '0';
-        }
+        // Hide canvas initially — scroll handler reveals it after the title screen.
+        viewerContainer.style.opacity = '0';
         const { min: tMin } = getTiltInfo();
         const modelWindows = Array.from(page.querySelectorAll('.narrative-model-window'));
 
@@ -835,22 +985,18 @@ async function init() {
             if (vis > bestVisible) { bestVisible = vis; activeIdx = i; }
           }
 
-          // Hide the canvas on text-only sections (phase < 0); show it for all others.
-          // Exception: explore model sections keep the canvas visible.
-          const _activeSec = activeIdx >= 0 ? SECTIONS[activeIdx] : null;
-          const _isExploreSec = _activeSec?.key === 'phase-2aa' || _activeSec?.key === 'phase-3a';
-          viewerContainer.style.opacity = (_activeSec && _activeSec.phase < 0 && !_isExploreSec) ? '0' : '1';
+          // Canvas always visible — model shows in top-down for phase 0, transitions to home in phase 1.
+          viewerContainer.style.opacity = '1';
+
+          // From the start of the last section (phase 8) onward, the canvas scrolls up
+          // with the page so the model exits through the top as the footer comes in.
+          const lastSectionTop = winTops[winTops.length - 1];
+          const scrolledPast = scrollY - lastSectionTop;
+          viewerContainer.style.transform = scrolledPast > 0
+            ? `translateY(${-scrolledPast}px)`
+            : 'none';
 
           if (activeIdx >= 0) {
-            const top = winTops[activeIdx] - scrollY;
-            const isLast = activeIdx === SECTIONS.length - 1;
-
-            // For the last section: once its model window has fully exited above
-            // the viewport, pin the canvas at translateY(0) so the light
-            // remediated model remains visible behind the narrative text.
-            const translateY = (isLast && top + vh <= 0) ? 0 : top;
-            viewerContainer.style.transform = `translateY(${translateY}px)`;
-
             const sec = SECTIONS[activeIdx];
             _applyPhase(sec.phase);
             if (sec.subPhase >= 0) _applyDissectedSubPhase(sec.subPhase);

@@ -661,7 +661,7 @@ body.scroll-locked {
 /* ── Narrative scroll-page mode ────────────────────────────────────────── */
 body.narrative-scroll-mode #viewer-container {
   position: fixed;
-  will-change: transform;
+  inset: 0;
 }
 
 /* Hide dissected side panels — text lives in the scroll page instead */
@@ -677,16 +677,19 @@ body.narrative-scroll-mode .diss-panels--left {
   z-index: 5;
 }
 
-/* Transparent window per phase — canvas shows through from behind */
-.narrative-model-window {
-  height: 70vh;
-  pointer-events: none;
+/* Each section is a 100vh viewport page; content is centered vertically */
+.narrative-scroll-section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Exempt phases keep their full 100vh window */
-[data-section-key="phase--1"] .narrative-model-window,
-[data-section-key="phase-2a"] .narrative-model-window {
-  height: 100vh;
+/* Model window is a full-coverage background layer — canvas shows through from behind */
+.narrative-model-window {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 /* Intro section (phase -1): center title card inside the model window */
@@ -702,11 +705,6 @@ body.narrative-scroll-mode .diss-panels--left {
   text-align: center;
 }
 
-/* Contact section (phase-contact): 3× heading, left-aligned follow button */
-.narrative-scroll-section--contact .narrative-heading {
-  font-size: 3.75rem;
-  line-height: 1.1;
-}
 
 .contact-follow-btn {
   display: inline-block;
@@ -731,9 +729,10 @@ body.narrative-scroll-mode .diss-panels--left {
   color: color-mix(in srgb, var(--text) 78%, var(--bg-dark));
 }
 
-/* Text zone below each model window */
+/* Text card — sits in flow as the flex child that gets centered by the section */
 .narrative-text-block {
-  min-height: 10vh;
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -824,29 +823,54 @@ body.narrative-scroll-mode .diss-panels--left {
   cursor: grabbing;
 }
 
-/* ── Credits section (phase-xx) ─────────────────────────────────────────── */
-.narrative-scroll-section--credits .narrative-model-window {
-  height: 0;
+/* ── Page footer (contact + credits) ────────────────────────────────────── */
+.narrative-footer {
+  position: relative;
+  z-index: 5;
+  background: var(--bg-dark, #eeeeee);
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.narrative-scroll-section--credits .narrative-text-block {
-  padding-top: 48px;
-  padding-bottom: 60px;
+.narrative-footer__inner {
+  max-width: min(900px, 90vw);
+  margin: 0 auto;
+  padding: 80px 24px 80px;
 }
 
-.narrative-scroll-section--credits .narrative-text-card {
-  width: min(900px, 90vw);
+.narrative-footer__contact {
+  margin-bottom: 80px;
+}
+
+.narrative-footer__contact-heading {
+  font-size: 3.75rem;
+  line-height: 1.1;
+  margin: 0 0 1.75rem;
+  color: var(--text);
+}
+
+.narrative-footer__credits {
   border-top: 1px solid var(--border-bright);
   padding-top: 48px;
 }
 
-.narrative-scroll-section--credits .narrative-heading {
+.narrative-footer__credits-label {
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   opacity: 0.4;
-  margin-bottom: 40px;
+  margin: 0 0 40px;
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .narrative-footer__inner {
+    padding: 60px 16px 60px;
+  }
+  .narrative-footer__contact-heading {
+    font-size: 2.5rem;
+  }
 }
 
 .credits-grid {

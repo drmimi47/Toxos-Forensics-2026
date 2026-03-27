@@ -477,32 +477,48 @@ export function createViewer() {
     controls.enabled = false;
   }
 
-  // Animate to a near-top-down position aligned with the home horizontal direction,
-  // so the tilt system's phi matches the isometric axis and the scroll-driven tilt
-  // flows continuously from top-down toward the home camera angle.
-  function goDissectedTopDown() {
-    const camera = activeCamera;
-    if (!homeState) return;
-    if (topDownAnim) topDownAnim.done = true;
+  // theta ≈ 0.001 rad (0.06°) — visually indistinguishable from straight down,
+  // but avoids the gimbal singularity that breaks lookAt / OrbitControls at theta = 0.
+  const TOPDOWN_THETA = 0.001;
 
+  function _topDownEndPos() {
     const target = homeState.target.clone();
     const dist = homeState.pos.distanceTo(target);
+    // phi = 0 keeps the model axis-aligned (no diagonal rotation) in top-down view.
+    return {
+      pos: new THREE.Vector3(
+        target.x,
+        target.y + dist * Math.cos(TOPDOWN_THETA),
+        target.z + dist * Math.sin(TOPDOWN_THETA)
+      ),
+      target,
+    };
+  }
 
-    // Derive the horizontal direction (phi) from the home position so tilting
-    // tracks the same azimuth as the recorded / remediated views.
-    const phi = Math.atan2(
-      homeState.pos.x - target.x,
-      homeState.pos.z - target.z
-    );
+  // Snap to top-down on the next animate frame by queuing an already-expired animation.
+  // This goes through the same proven topDownAnim completion path as goDissectedTopDown.
+  function snapToTopDown() {
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+    const { pos, target } = _topDownEndPos();
+    const lookAtMatrix = new THREE.Matrix4().lookAt(pos, target, new THREE.Vector3(0, 1, 0));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: pos.clone(), endPos: pos.clone(),
+      startQuat: endQuat.clone(), endQuat: endQuat.clone(),
+      target,
+      t0: 0, duration: 1, // t0=0 + duration=1ms → always expired on first frame
+      done: false,
+    };
+    controls.enabled = false;
+  }
 
-    // Place camera at TILT_THETA_MIN elevation in that direction — nearly top-down
-    // but well-defined so lookAt won't hit a gimbal singularity.
-    const endPos = new THREE.Vector3(
-      target.x + dist * Math.sin(TILT_THETA_MIN) * Math.sin(phi),
-      target.y + dist * Math.cos(TILT_THETA_MIN),
-      target.z + dist * Math.sin(TILT_THETA_MIN) * Math.cos(phi)
-    );
-
+  // Animate to near-vertical top-down.
+  function goDissectedTopDown() {
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+    const camera = activeCamera;
+    const { pos: endPos, target } = _topDownEndPos();
     const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, target, new THREE.Vector3(0, 1, 0));
     const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
     topDownAnim = {
@@ -533,5 +549,5 @@ export function createViewer() {
     applyPanelToCamera();
   }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift };
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, snapToTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift };
 }

@@ -2,12 +2,24 @@
 
 export const NARRATIVE_CONTENT = {
 
-  'phase--1': {
-    heading: 'We are Exposing Toxicity in<br>New Town Creek',
+  'phase-0': {
+    heading: 'We are exposing toxicity in<br>New Town Creek',
     body: [],
   },
 
-  'phase-0': {
+  'phase-1': {
+    heading: 'Title',
+    body: [
+      `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vehicula
+       libero at urna pretium, nec ullamcorper justo viverra. Fusce tincidunt
+       eros id sapien laoreet, eget mollis nulla facilisis.`,
+      `Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere
+       cubilia curae. Donec euismod quam vel leo cursus, at efficitur risus
+       bibendum. Pellentesque habitant morbi tristique senectus.`,
+    ],
+  },
+
+  'phase-3': {
     heading: "Title",
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vehicula
@@ -19,7 +31,7 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-1-cso': {
+  'phase-2-a': {
     heading: 'Combined Sewer Overflows (CSO)',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi scelerisque
@@ -31,7 +43,7 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-1-npdes': {
+  'phase-2-b': {
     heading: 'National Pollutant Discharge Elimination System (NPDES)',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis
@@ -43,7 +55,7 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-1-rcra': {
+  'phase-2-c': {
     heading: 'Regulated Hazardous Waste Facilities (RCRA)',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis
@@ -54,7 +66,7 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-2': {
+  'phase-4': {
     heading: 'Placeholder for Fatberg',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. At vero eos et
@@ -66,17 +78,17 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-2aa': {
+  'phase-5': {
     heading: '<span class="explore-model-trigger" role="button" tabindex="0">Explore Model</span>',
     body: [],
   },
 
-  'phase-2a': {
+  'phase-6': {
     heading: 'What is Remediation for Us?',
     body: [],
   },
 
-  'phase-3': {
+  'phase-7': {
     heading: 'Placeholder Title',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in urna
@@ -88,36 +100,9 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
-  'phase-3a': {
+  'phase-8': {
     heading: '<span class="explore-model-trigger" role="button" tabindex="0">Explore Model</span>',
     body: [],
-  },
-
-  'phase-contact': {
-    heading: 'Towards Detoxification',
-    body: ['<a class="contact-follow-btn" href="https://www.instagram.com/toxos_x/?hl=en" target="_blank" rel="noopener noreferrer">follow</a>'],
-  },
-
-  'phase-xx': {
-    heading: 'Credits',
-    body: [
-      `<div class="credits-grid">
-        <div class="credits-col">
-          <span class="credits-label">Founders</span>
-          — Shannon Levkovitz<br>— Julio Viejo Romero-Mazariegos<br>— Patrick Rodriguez<br>— Claire Galla<br>— Samantha Nowak
-        </div>
-        <div class="credits-col">
-          <span class="credits-label">Contributors</span>
-          — Benny Yang<br>— Daegeun Kim<br>— Cole Chroman
-        </div>
-        <div class="credits-col">
-          <span class="credits-label">Guest Speakers</span>
-          — Christopher Swain<br>— Mark Wasiuta
-        </div>
-      </div>
-      <p class="credits-footnote">With support from the community of Columbia University GSAPP</p>
-      <p class="credits-footnote">© 2026 TOXOS. All rights reserved.</p>`,
-    ],
   },
 
 };

@@ -100,6 +100,7 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
     map: lightTex,
     sizeAttenuation: false, // constant screen size — shader cancels depth attenuation
     transparent: true,
+    opacity: 0,
     depthWrite: false,
     depthTest: false,
     blending: THREE.NormalBlending,

@@ -18,14 +18,19 @@
  *
  * PHASE KEYS (must match NARRATIVE_CONTENT keys in narrativeText.js)
  * ------------------------------------------------------------------
- *   'phase--1'     intro title card (text-only, no model)
- *   'phase-0'      all datasets visible, exploded
- *   'phase-1-cso'  CSO sequential reveal
- *   'phase-1-npdes' NPDES sequential reveal
- *   'phase-1-rcra'  RCRA sequential reveal
- *   'phase-2'      infrastructure under pressure
- *   'phase-2a'     interstitial (text-only, no model)
- *   'phase-3'      toward remediation
+ *   'phase-0'    title card (text-only, no model)
+ *   'phase-1'    blank model (no data points)
+ *   'phase-2-a'  CSO sequential reveal
+ *   'phase-2-b'  NPDES sequential reveal
+ *   'phase-2-c'  RCRA sequential reveal
+ *   'phase-3'    all datasets visible, collapsed to ground
+ *   'phase-4'    fatberg
+ *   'phase-5'    explore model (interstitial)
+ *   'phase-6'    what is remediation (text-only)
+ *   'phase-7'    toward remediation
+ *   'phase-8'    explore model (interstitial)
+ *   'phase-9'    towards detoxification (contact)
+ *   'phase-10'   credits
  */
 
 
@@ -36,14 +41,15 @@
 // ---------------------------------------------------------------------------
 
 export const VIZ_REGISTRY = {
-  'phase--1':     [],
-  'phase-0':      [],
-  'phase-1-cso':  [],
-  'phase-1-npdes': [],
-  'phase-1-rcra': [],
-  'phase-2':      [],
-  'phase-2a':     [],
-  'phase-3':      [],
+  'phase-0':   [],
+  'phase-1':   [],
+  'phase-2-a': [],
+  'phase-2-b': [],
+  'phase-2-c': [],
+  'phase-3':   [],
+  'phase-4':   [],
+  'phase-6':   [],
+  'phase-7':   [],
 };
 
 
