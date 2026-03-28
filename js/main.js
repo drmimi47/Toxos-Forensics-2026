@@ -638,6 +638,9 @@ async function init() {
         const cfg = PHASE_MODEL_CONFIG[phase];
         if (!cfg) return;
 
+        // Cancel any in-flight subphase fade so it can't hide groups after we show them.
+        ++_subFadeToken;
+
         if (cfg.narrativeKey) setNarrativeContent(cfg.narrativeKey);
 
         isDissected = cfg.isDissected;
@@ -996,11 +999,36 @@ async function init() {
             ? `translateY(${-scrolledPast}px)`
             : 'none';
 
+          // Scroll-driven lift: scrub datapoints from ground to stacked heights
+          // between the midpoint of phase-3 and the start of phase-4.
+          // Hold activeIdx at phase-3 during the lift so _applyPhase(4) (and its
+          // fadeOverlays(false)) doesn't fire until the groups are already up.
+          const P3_IDX = 5, P4_IDX = 6;
+          let inLiftZone = false;
+          let liftT = 0;
+          if (winTops.length > P4_IDX) {
+            const liftStart = winTops[P3_IDX] + (winTops[P4_IDX] - winTops[P3_IDX]) * 0.5;
+            const liftEnd   = winTops[P4_IDX];
+            if (scrollY >= liftStart && scrollY < liftEnd && currentPhase !== 4) {
+              inLiftZone = true;
+              liftT = (scrollY - liftStart) / (liftEnd - liftStart);
+              if (activeIdx === P4_IDX) activeIdx = P3_IDX;
+            }
+          }
+
           if (activeIdx >= 0) {
             const sec = SECTIONS[activeIdx];
             _applyPhase(sec.phase);
             if (sec.subPhase >= 0) _applyDissectedSubPhase(sec.subPhase);
             if (_exploreActive && _activeExploreSection?.dataset.sectionKey !== sec.key) deactivateExplore();
+          }
+
+          if (inLiftZone) {
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            explodeGroups.forEach((g, i) => {
+              g.position.y = liftT * (i + 1) * 700;
+              targetY[i]   = g.position.y;
+            });
           }
 
           // Tilt: map overall scroll progress to camera angle.
