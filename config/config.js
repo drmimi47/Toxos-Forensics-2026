@@ -33,6 +33,7 @@ const CONFIG = {
     orthoSize: 3000,
     initialZoom: 0.99,   // ← fraction of viewport the model fills in the interactive state; higher = more zoomed in
     narrativeZoom: 0.92, // ← zoom multiplier during narrative scroll (relative to initialZoom); lower = smaller model
+    exploreZoom:   1.25, // ← zoom multiplier for phase-5 / phase-8 "Explore Model" interstitials
     position: { x: 0, y: 2500, z: 4000 }
   },
 

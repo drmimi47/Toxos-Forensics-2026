@@ -1,14 +1,14 @@
 /* @property required for CSS transitions on custom color properties */
 @property --bg-dark {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #d6d2ca;
-}
 @property --bg-panel {
   syntax: "<color>";
   inherits: true;
   initial-value: rgba(255, 255, 255, 0.45);
+}  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6d2ca;
 }
+
 @property --border {
   syntax: "<color>";
   inherits: true;
@@ -80,6 +80,11 @@ body.dark .footer-controls .key {
 
 body.dark .dp-meta-grid {
   background: rgba(255, 255, 255, 0.02);
+}
+
+body.dark .dp-body,
+body.dark .dp-tab {
+  background: rgba(12, 12, 12, 0.6);
 }
 
 .legend-dot.cso   { background: var(--cso-color);   }

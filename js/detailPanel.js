@@ -60,11 +60,18 @@ let lastClosedAt = 0;
 let lastActiveKey = null;
 let openOrderCounter = 0;
 
-const STACK_OFFSET = 28;
 
-function _panelStartTop() {
-  // Place panels in the bottom-right quadrant, clearing the header above.
-  return Math.round(window.innerHeight * 0.55);
+function _randomPanelPosition() {
+  const panelW  = 540;
+  const panelH  = 480; // approximate panel height
+  const margin  = 24;
+  const headerH = 80;  // clear the top header
+  const maxLeft = Math.max(margin, window.innerWidth  - panelW - margin);
+  const maxTop  = Math.max(headerH, window.innerHeight - panelH - margin);
+  return {
+    left: Math.round(margin  + Math.random() * (maxLeft - margin)),
+    top:  Math.round(headerH + Math.random() * (maxTop  - headerH)),
+  };
 }
 
 class PanelInstance {
@@ -79,9 +86,9 @@ class PanelInstance {
     this.el = document.createElement('div');
     this.el.className = 'detail-panel hidden';
     this.el.setAttribute('aria-hidden', 'true');
-    this.el.style.top    = `${_panelStartTop()}px`;
+    this.el.style.top    = '0';
     this.el.style.bottom = 'auto';
-    this.el.style.zIndex = '100';
+    this.el.style.zIndex = '9000';
     this.el.innerHTML = `
       <div class="dp-tab">
         <span class="dp-counter"></span>
@@ -189,9 +196,9 @@ class PanelInstance {
   }
 
   _bringToFront() {
-    let maxZ = 99;
+    let maxZ = 8999;
     panelMap.forEach(p => {
-      const z = parseInt(p.el.style.zIndex || '100', 10);
+      const z = parseInt(p.el.style.zIndex || '9000', 10);
       if (z > maxZ) maxZ = z;
     });
     this.el.style.zIndex = String(maxZ + 1);
@@ -210,7 +217,10 @@ class PanelInstance {
     this.renderPoint(false);
 
     this.displayOrder = openOrderCounter++;
-    this.el.style.top = `${_panelStartTop() + this.displayOrder * STACK_OFFSET}px`;
+    const pos = _randomPanelPosition();
+    this.el.style.left  = `${pos.left}px`;
+    this.el.style.right = 'auto';
+    this.el.style.top   = `${pos.top}px`;
 
     this.el.style.transform = this.dragTransform || '';
     this.el.classList.remove('hidden');

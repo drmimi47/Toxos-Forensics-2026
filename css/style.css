@@ -388,28 +388,19 @@ body {
 .detail-panel {
   position: fixed;
   top: 55vh;
-  right: 24px;
+  left: 24px;
+  right: auto;
   bottom: auto;
   width: 540px;
-  z-index: 100;
+  z-index: 9000;
   background: transparent;
   pointer-events: none;
-  opacity: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  transform: translateX(calc(100% + 32px)) scale(0.96);
-  filter: blur(10px);
-  transition:
-    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
-    transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
-    filter 0.30s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .detail-panel.visible {
-  opacity: 1;
-  transform: translateX(0) scale(1);
-  filter: blur(0px);
   pointer-events: all;
 }
 
@@ -430,9 +421,14 @@ body {
   padding: 5px 18px;
   min-width: 72px;
   cursor: grab;
-  background: var(--bg-panel);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(0px) saturate(100%);
+  -webkit-backdrop-filter: blur(0px) saturate(100%);
+  opacity: 0;
+  transition:
+    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    backdrop-filter 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    -webkit-backdrop-filter 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   border: 1px solid var(--border-bright);
   border-bottom: none;
   border-radius: 5px 5px 0 0;
@@ -446,9 +442,14 @@ body {
 .dp-body {
   width: 100%;
   height: 310px;
-  background: var(--bg-panel);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(0px) saturate(100%);
+  -webkit-backdrop-filter: blur(0px) saturate(100%);
+  opacity: 0;
+  transition:
+    opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    backdrop-filter 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    -webkit-backdrop-filter 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   border: 1px solid var(--border-bright);
   border-radius: 0 6px 6px 6px;
   box-shadow:
@@ -459,6 +460,13 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.detail-panel.visible .dp-tab,
+.detail-panel.visible .dp-body {
+  opacity: 1;
+  backdrop-filter: blur(48px) saturate(200%);
+  -webkit-backdrop-filter: blur(48px) saturate(200%);
 }
 
 .dp-draggable {
@@ -662,6 +670,7 @@ body.scroll-locked {
 body.narrative-scroll-mode #viewer-container {
   position: fixed;
   inset: 0;
+  z-index: 3;
 }
 
 /* Hide dissected side panels — text lives in the scroll page instead */
@@ -675,6 +684,7 @@ body.narrative-scroll-mode .diss-panels--left {
 .narrative-scroll-page {
   position: relative;
   z-index: 5;
+  padding-bottom: 100vh;
 }
 
 /* Each section is a 100vh viewport page; content is centered vertically */
@@ -825,17 +835,24 @@ body.narrative-scroll-mode .diss-panels--left {
 
 /* ── Page footer (contact + credits) ────────────────────────────────────── */
 .narrative-footer {
-  position: relative;
-  z-index: 5;
-  background: var(--bg-dark, #eeeeee);
-  width: 100%;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  z-index: 2;
+  background: var(--accent, #a7ce08);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .narrative-footer__inner {
   max-width: min(900px, 90vw);
   margin: 0 auto;
-  padding: 80px 24px 80px;
+  padding: 0 24px;
+  width: 100%;
 }
 
 .narrative-footer__contact {

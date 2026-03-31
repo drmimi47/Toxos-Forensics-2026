@@ -694,6 +694,14 @@ async function init() {
         // Camera transitions for the opening sequence.
         if (phase === 0) goDissectedTopDown(); // title: top-down view
         if (phase === 1) goHome();             // blank model: animate to home pose
+
+        // Zoom in on explore-model interstitials, zoom back out when leaving.
+        const _nz = homeZoom * (CONFIG.camera.narrativeZoom ?? 0.92);
+        if (phase === 5 || phase === 8) {
+          setZoom(homeZoom * (CONFIG.camera.exploreZoom ?? 1.25));
+        } else if (prevPhase === 5 || prevPhase === 8) {
+          setZoom(_nz);
+        }
       }
 
       // Auto-start the narrative scroll experience once the preloader has faded out.
