@@ -50,9 +50,95 @@ function setProgress(pct, label) {
 function hidePreloader() {
   setProgress(100, "Complete");
   setTimeout(() => {
-    preloaderEl?.classList.add("done");
-    updatePageScrollLock();
-    _onPreloaderComplete?.();
+    const brandEl     = preloaderEl?.querySelector('.preloader-brand');
+    const headerBrand = document.querySelector('.brand-mark');
+    const barTrackEl  = preloaderEl?.querySelector('.preloader-bar-track');
+    const textEl      = preloaderEl?.querySelector('.preloader-text');
+
+    if (!brandEl || !headerBrand || !preloaderEl) {
+      preloaderEl?.classList.add("done");
+      updatePageScrollLock();
+      _onPreloaderComplete?.();
+      return;
+    }
+
+    // Fade out the bar and status text before the logo animation begins.
+    const fadeEls = [barTrackEl, textEl].filter(Boolean);
+    fadeEls.forEach(el => {
+      el.style.transition = 'opacity 0.3s linear';
+      el.style.opacity    = '0';
+    });
+
+    setTimeout(() => {
+      const fromRect = brandEl.getBoundingClientRect();
+      const toRect   = headerBrand.getBoundingClientRect();
+
+      // Hide header logo while the preloader logo travels into its place.
+      headerBrand.style.visibility = 'hidden';
+
+      // Pin brand at its current screen position and move it to <body> so it
+      // is unaffected by the preloader's visibility or transform later.
+      brandEl.style.position  = 'fixed';
+      brandEl.style.left      = fromRect.left + 'px';
+      brandEl.style.top       = fromRect.top  + 'px';
+      brandEl.style.margin    = '0';
+      brandEl.style.transform = 'none';
+      brandEl.style.zIndex    = '10000';
+      document.body.appendChild(brandEl);
+
+      // Suppress the stylesheet opacity transition so we drive everything manually.
+      preloaderEl.style.transition = 'none';
+
+      const dx       = toRect.left - fromRect.left;
+      const dy       = toRect.top  - fromRect.top;
+      const duration = 1125; // ms – total logo travel time
+      let overlayStarted = false;
+      let start = null;
+
+      // Cubic ease-in-out: slow → fast → slow.
+      function easeInOut(t) {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      }
+
+      function tick(ts) {
+        if (!start) start = ts;
+        const t  = Math.min((ts - start) / duration, 1);
+        const et = easeInOut(t);
+
+        // Eased logo movement.
+        brandEl.style.left = (fromRect.left + dx * et) + 'px';
+        brandEl.style.top  = (fromRect.top  + dy * et) + 'px';
+
+        // At 50% of logo travel, slide the overlay panel upward off-screen.
+        // Only mark done via transitionend so visibility:hidden never kills the animation mid-slide.
+        if (t >= 0.5 && !overlayStarted) {
+          overlayStarted = true;
+          preloaderEl.addEventListener('transitionend', function onDone() {
+            preloaderEl.removeEventListener('transitionend', onDone);
+            preloaderEl.style.transition = 'none';
+            preloaderEl.classList.add("done");
+          });
+          preloaderEl.style.transition = 'transform 1.4s cubic-bezier(0.42, 0, 0.58, 1)';
+          preloaderEl.style.transform  = 'translateY(-120vh)';
+        }
+
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          // Logo has arrived — reveal header brand, unlock scroll, fire callbacks.
+          // The panel continues its own transition independently until transitionend.
+          headerBrand.style.visibility = '';
+          document.body.classList.remove("scroll-locked");
+          document.documentElement.classList.remove("scroll-locked");
+          _onPreloaderComplete?.();
+          brandEl.style.transition = 'opacity 0.35s linear';
+          brandEl.style.opacity    = '0';
+          setTimeout(() => brandEl.remove(), 380);
+        }
+      }
+
+      requestAnimationFrame(tick);
+    }, 350); // wait for bar + text fade to finish
   }, 400);
 }
 
@@ -831,11 +917,13 @@ async function init() {
         let _exploreCamSnapshot = null;
         let _activeExploreSection = null;
         let _activeExploreMWin = null;
+        let _restoreCamRafId = null;
 
         const _exploreFooterControls = document.querySelector('.footer-controls');
 
         function activateExplore(section) {
           if (_exploreActive) return;
+          if (_restoreCamRafId) { cancelAnimationFrame(_restoreCamRafId); _restoreCamRafId = null; }
           _exploreActive = true;
           _activeExploreSection = section;
           _activeExploreMWin = section.querySelector('.narrative-model-window');
@@ -851,6 +939,9 @@ async function init() {
 
           setControlsInteraction(true, true, true);
           section.classList.add('explore-mode-active');
+
+          // Subtle zoom nudge to signal the model is now interactive.
+          setZoom(homeZoom * (CONFIG.camera.exploreZoom ?? 1.25) * 1.06);
 
           if (_exploreFooterControls) {
             _exploreFooterControls.style.transition = 'opacity 0.4s';
@@ -921,16 +1012,42 @@ async function init() {
             }, 400);
           }
 
-          // Restore camera + controls to the state before explore was activated.
+          // Gently tween camera + controls back to the state before explore was activated.
           if (_exploreCamSnapshot) {
-            const cam = getCamera();
-            cam.position.copy(_exploreCamSnapshot.position);
-            cam.quaternion.copy(_exploreCamSnapshot.quaternion);
-            cam.zoom = _exploreCamSnapshot.zoom;
-            cam.updateProjectionMatrix();
-            controls.target.copy(_exploreCamSnapshot.target);
-            controls.update();
+            const snap = _exploreCamSnapshot;
             _exploreCamSnapshot = null;
+            if (_restoreCamRafId) { cancelAnimationFrame(_restoreCamRafId); _restoreCamRafId = null; }
+            const cam = getCamera();
+            const tPos  = snap.position.clone();
+            const tQuat = snap.quaternion.clone();
+            const tTgt  = snap.target.clone();
+            const tZoom = snap.zoom;
+            const a = 0.07;
+            function tickRestore() {
+              cam.position.lerp(tPos, a);
+              cam.quaternion.slerp(tQuat, a);
+              cam.zoom = THREE.MathUtils.lerp(cam.zoom, tZoom, a);
+              cam.updateProjectionMatrix();
+              controls.target.lerp(tTgt, a);
+              controls.update();
+              const done =
+                cam.position.distanceTo(tPos) < 0.005 &&
+                cam.quaternion.angleTo(tQuat)  < 0.0005 &&
+                Math.abs(cam.zoom - tZoom)     < 0.0005 &&
+                controls.target.distanceTo(tTgt) < 0.005;
+              if (done) {
+                cam.position.copy(tPos);
+                cam.quaternion.copy(tQuat);
+                cam.zoom = tZoom;
+                cam.updateProjectionMatrix();
+                controls.target.copy(tTgt);
+                controls.update();
+                _restoreCamRafId = null;
+              } else {
+                _restoreCamRafId = requestAnimationFrame(tickRestore);
+              }
+            }
+            _restoreCamRafId = requestAnimationFrame(tickRestore);
           }
 
           _activeExploreSection = null;
