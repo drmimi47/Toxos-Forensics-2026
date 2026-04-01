@@ -78,35 +78,24 @@ body {
 
 .preloader-content {
   text-align: center;
-  width: 180px;
+  width: fit-content;
 }
 
 .preloader-brand {
-  font-family: var(--font-mono);
-  font-size: 2.025rem;
-  font-weight: 500;
-  letter-spacing: 0.3em;
+  font-family: 'Geist Mono', var(--font-mono);
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: normal;
   color: #000000;
-  margin-bottom: 1rem;
-  transform: translateX(4.5px);
-}
-
-.preloader-brand-sub {
-  font-size: 0.75rem;
-  font-weight: 400;
-  letter-spacing: 0.15em;
-  color: #000000;
-  margin-left: 0.4em;
-  vertical-align: top;
-  position: relative;
-  top: 9px;
+  margin-bottom: 4px;
 }
 
 .preloader-bar-track {
   position: relative;
   width: 100%;
-  height: 3px;
-  background: #ffffff;
+  height: 6px;
+  background: transparent;
+  border: 1px solid #000000;
   border-radius: 0;
   overflow: hidden;
   margin-bottom: 8px;
@@ -126,14 +115,14 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  width: 35%;
+  width: 50px;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.35) 50%,
+    #a7ce08 50%,
     transparent 100%
   );
-  animation: bar-shimmer 1.8s ease-in-out infinite;
+  animation: bar-shimmer 1.5s ease-in infinite;
 }
 
 @keyframes bar-shimmer {
@@ -176,7 +165,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
+  padding: 12px 16px;
   background: transparent;
   pointer-events: none;
   mix-blend-mode: difference;
@@ -189,26 +178,14 @@ body {
 }
 
 .brand-mark {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 2.025rem;
-  letter-spacing: 0.3em;
+  font-family: 'Geist Mono', var(--font-mono);
+  font-weight: 300;
+  font-size: 1rem;
+  letter-spacing: normal;
   color: #ffffff;
   pointer-events: auto;
   cursor: pointer;
   text-decoration: none;
-}
-
-.brand-sub {
-  /* explicit white required — mix-blend-mode: difference inverts against both light and dark backgrounds */
-  font-size: 0.75rem;
-  font-weight: 400;
-  letter-spacing: 0.15em;
-  color: #ffffff;
-  margin-left: 0.4em;
-  vertical-align: top;
-  position: relative;
-  top: 9px;
 }
 
 .brand-divider {

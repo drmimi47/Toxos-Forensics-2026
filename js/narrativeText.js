@@ -3,7 +3,7 @@
 export const NARRATIVE_CONTENT = {
 
   'phase-0': {
-    heading: 'We are exposing toxicity in<br>New Town Creek',
+    heading: 'Uncovering toxicity in New Town Creek',
     body: [],
   },
 

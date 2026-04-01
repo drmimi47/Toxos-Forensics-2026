@@ -131,9 +131,7 @@ function hidePreloader() {
           document.body.classList.remove("scroll-locked");
           document.documentElement.classList.remove("scroll-locked");
           _onPreloaderComplete?.();
-          brandEl.style.transition = 'opacity 0.35s linear';
-          brandEl.style.opacity    = '0';
-          setTimeout(() => brandEl.remove(), 380);
+          brandEl.remove();
         }
       }
 
