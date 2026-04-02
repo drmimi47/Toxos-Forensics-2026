@@ -9,6 +9,7 @@ import { addAllLabels } from "./labels.js";
 import { buildTerrainSnapper } from "./terrainSnap.js";
 import { initNarrativePanel, setNarrativeContent, NARRATIVE_CONTENT } from "./narrativeText.js";
 import { mountPhaseViz } from "./phase-vizdata.js";
+import { mountNarrativeTimeline } from "./narrativeTimeline.js";
 
 // Per-mode visual settings. Edit these values to retheme each submenu independently.
 // bg:           hex color for the 3D viewport background.
@@ -920,6 +921,9 @@ async function init() {
         `;
         document.body.appendChild(narrativeFooter);
 
+        // ── Narrative Timeline ────────────────────────────────────────────
+        const { dotWraps: _dotWraps } = mountNarrativeTimeline(page, SECTIONS);
+
         // ── Explore Model sections (generalized) ──────────────────────────
         let _exploreActive = false;
         let _mouseInExplore = false;
@@ -1183,6 +1187,8 @@ async function init() {
             if (sec.subPhase >= 0) _applyDissectedSubPhase(sec.subPhase);
             if (_exploreActive && _activeExploreSection?.dataset.sectionKey !== sec.key) deactivateExplore();
           }
+
+          _dotWraps.forEach((w, i) => w.classList.toggle('active', i === activeIdx));
 
           if (inLiftZone) {
             if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
