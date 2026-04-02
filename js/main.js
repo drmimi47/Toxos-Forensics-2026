@@ -894,28 +894,32 @@ async function init() {
         narrativeFooter.className = 'narrative-footer';
         narrativeFooter.innerHTML = `
           <div class="narrative-footer__inner">
-            <div class="narrative-footer__contact">
-              <h2 class="narrative-footer__contact-heading">Towards Detoxification</h2>
-              <a class="contact-follow-btn" href="https://www.instagram.com/toxos_x/?hl=en" target="_blank" rel="noopener noreferrer">follow</a>
-            </div>
-            <div class="narrative-footer__credits">
-              <p class="narrative-footer__credits-label">Credits</p>
-              <div class="credits-grid">
-                <div class="credits-col">
+            <div class="footer-two-col">
+              <div class="footer-col footer-col--left">
+                <a class="footer-heading-link" href="https://www.instagram.com/toxos_x/?hl=en" target="_blank" rel="noopener noreferrer">Towards Detoxification</a>
+                <p class="footer-inst-note">With support from the community of Columbia University GSAPP</p>
+                <p class="footer-inst-note">© 2026 TOXOS. ALL RIGHTS RESERVED.</p>
+              </div>
+              <div class="footer-col footer-col--right">
+                <div class="credits-list">
                   <span class="credits-label">Founders</span>
-                  — Shannon Levkovitz<br>— Julio Viejo Romero-Mazariegos<br>— Patrick Rodriguez<br>— Claire Galla<br>— Samantha Nowak
-                </div>
-                <div class="credits-col">
+                  <span class="credits-name">Shannon Levkovitz</span>
+                  <span class="credits-name">Julio Viejo Romero-Mazariegos</span>
+                  <span class="credits-name">Patrick Rodriguez</span>
+                  <span class="credits-name">Claire Galla</span>
+                  <span class="credits-name">Samantha Nowak</span>
                   <span class="credits-label">Contributors</span>
-                  — Benny Yang<br>— Daegeun Kim<br>— Cole Chroman
-                </div>
-                <div class="credits-col">
+                  <span class="credits-name">Benny Yang</span>
+                  <span class="credits-name">Cole Chroman</span>
+                  <span class="credits-name">Xiaodian Yi</span>
+                  <span class="credits-label">Advisors</span>
+                  <span class="credits-name">Amelyn Ng</span>
+                  <span class="credits-name">Xiaoxi Chen</span>
                   <span class="credits-label">Guest Speakers</span>
-                  — Christopher Swain<br>— Mark Wasiuta
+                  <span class="credits-name">Christopher Swain</span>
+                  <span class="credits-name">Mark Wasiuta</span>
                 </div>
               </div>
-              <p class="credits-footnote">With support from the community of Columbia University GSAPP</p>
-              <p class="credits-footnote">© 2026 TOXOS. All rights reserved.</p>
             </div>
           </div>
         `;
