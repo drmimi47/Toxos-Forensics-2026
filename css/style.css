@@ -822,10 +822,7 @@ body.narrative-scroll-mode .diss-panels--left {
   transition: opacity 0.3s;
 }
 .explore-mode-active .narrative-model-window {
-  cursor: grab;
-}
-.explore-mode-active .narrative-model-window:active {
-  cursor: grabbing;
+  cursor: default;
 }
 
 /* ── Explore frame overlay ───────────────────────────────────────────────── */

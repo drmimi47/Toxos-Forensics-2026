@@ -270,8 +270,9 @@ export function createViewer() {
   }
 
   function setControlsInteraction(rotate, pan, zoom) {
-    controls.mouseButtons.LEFT = rotate ? THREE.MOUSE.ROTATE : null;
-    controls.mouseButtons.RIGHT = pan ? THREE.MOUSE.PAN : null;
+    controls.mouseButtons.LEFT   = rotate ? THREE.MOUSE.ROTATE : null;
+    controls.mouseButtons.MIDDLE = zoom   ? THREE.MOUSE.DOLLY  : null;
+    controls.mouseButtons.RIGHT  = pan    ? THREE.MOUSE.PAN    : null;
     controls.enableZoom = zoom;
   }
 
@@ -332,6 +333,7 @@ export function createViewer() {
   const PARALLAX_LERP = 0.05;
   let _mouseNX = 0, _mouseNY = 0;
   let _parallaxH = 0, _parallaxV = 0; // lerped horizontal / vertical offsets
+  let _parallaxEnabled = true;
   const _camRight = new THREE.Vector3();
   const _camUp    = new THREE.Vector3();
   const _qH = new THREE.Quaternion();
@@ -428,8 +430,11 @@ export function createViewer() {
 
     // Mouse parallax — rotate scene around camera's own right/up axes so the
     // tilt is always screen-aligned: model tips toward the cursor.
-    _parallaxH += ( _mouseNX * PARALLAX_MAX - _parallaxH) * PARALLAX_LERP;
-    _parallaxV += ( _mouseNY * PARALLAX_MAX - _parallaxV) * PARALLAX_LERP;
+    // Lerp toward zero when disabled so it eases out instead of snapping.
+    const _parallaxTarget = _parallaxEnabled ? _mouseNX * PARALLAX_MAX : 0;
+    const _parallaxTargetV = _parallaxEnabled ? _mouseNY * PARALLAX_MAX : 0;
+    _parallaxH += (_parallaxTarget  - _parallaxH) * PARALLAX_LERP;
+    _parallaxV += (_parallaxTargetV - _parallaxV) * PARALLAX_LERP;
     _camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
     _camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
     _qH.setFromAxisAngle(_camUp,    _parallaxH);
@@ -576,5 +581,7 @@ export function createViewer() {
     applyPanelToCamera();
   }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, snapToTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift };
+  function setParallaxEnabled(enabled) { _parallaxEnabled = enabled; }
+
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, snapToTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift, setParallaxEnabled };
 }

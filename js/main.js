@@ -151,7 +151,7 @@ async function init() {
 
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere, setParallaxEnabled } = createViewer();
 
   renderer.domElement.addEventListener('wheel', (e) => {
     // Non-narrative wheel events are handled by viewer controls directly.
@@ -952,6 +952,7 @@ async function init() {
           };
 
           setControlsInteraction(true, true, true);
+          setParallaxEnabled(false);
           section.classList.add('explore-mode-active');
 
           // Show anchored labels only during explore mode.
@@ -990,23 +991,25 @@ async function init() {
             }));
           }
           function fwdWheel(e) {
-            if (!e.ctrlKey) return;
             e.preventDefault();
             e.stopPropagation();
             canvas.dispatchEvent(new WheelEvent('wheel', {
               deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ,
               deltaMode: e.deltaMode,
               clientX: e.clientX, clientY: e.clientY,
-              ctrlKey: true,
+              ctrlKey: e.ctrlKey,
               bubbles: false,
             }));
           }
+
+          function blockContextMenu(e) { e.preventDefault(); }
 
           mw.addEventListener('pointerdown',   fwdPointer);
           mw.addEventListener('pointermove',   fwdPointer);
           mw.addEventListener('pointerup',     fwdPointer);
           mw.addEventListener('pointercancel', fwdPointer);
           mw.addEventListener('wheel', fwdWheel, { passive: false });
+          mw.addEventListener('contextmenu', blockContextMenu);
 
           _exploreForwardCleanup = () => {
             mw.removeEventListener('pointerdown',   fwdPointer);
@@ -1014,6 +1017,7 @@ async function init() {
             mw.removeEventListener('pointerup',     fwdPointer);
             mw.removeEventListener('pointercancel', fwdPointer);
             mw.removeEventListener('wheel', fwdWheel);
+            mw.removeEventListener('contextmenu', blockContextMenu);
             mw.style.pointerEvents = '';
             mw.style.touchAction = '';
           };
@@ -1023,6 +1027,7 @@ async function init() {
           if (!_exploreActive) return;
           _exploreActive = false;
           setControlsInteraction(false, false, false);
+          setParallaxEnabled(true);
           _activeExploreSection?.classList.remove('explore-mode-active');
           if (_exploreForwardCleanup) { _exploreForwardCleanup(); _exploreForwardCleanup = null; }
 
