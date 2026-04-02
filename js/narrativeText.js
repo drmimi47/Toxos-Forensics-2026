@@ -8,7 +8,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-1': {
-    heading: 'Title',
+    heading: 'We are TOXOS',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vehicula
        libero at urna pretium, nec ullamcorper justo viverra. Fusce tincidunt
@@ -20,7 +20,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-3': {
-    heading: "Title",
+    heading: "Title Placeholder",
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vehicula
        libero at urna pretium, nec ullamcorper justo viverra. Fusce tincidunt
@@ -32,7 +32,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-2-a': {
-    heading: 'Combined Sewer Overflows (CSO)',
+    heading: 'CSO: Combined Sewer Overflows',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi scelerisque
        lectus nec magna tempor, a sodales eros dictum. Praesent ullamcorper augue
@@ -44,7 +44,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-2-b': {
-    heading: 'National Pollutant Discharge Elimination System (NPDES)',
+    heading: 'NPDES: National Pollutant Discharge Elimination System',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam facilisis
        urna at cursus dictum. Nisi erat dictum erat, nec dictum urna erat nec
@@ -56,7 +56,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-2-c': {
-    heading: 'Regulated Hazardous Waste Facilities (RCRA)',
+    heading: 'RCRA: Regulated Hazardous Waste Facilities',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis
        unde omnis iste natus error sit voluptatem accusantium doloremque laudantium,
@@ -67,7 +67,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-4': {
-    heading: 'Placeholder for Fatberg',
+    heading: 'Visualizing Fatbergs',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. At vero eos et
        accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium
@@ -84,7 +84,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-6': {
-    heading: 'What is Remediation for Us?',
+    heading: 'What does the future hold?',
     body: [],
   },
 

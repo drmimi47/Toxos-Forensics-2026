@@ -545,7 +545,6 @@ async function init() {
         stopZoomTween(true);
       });
 
-      const creditsOverlay = document.getElementById('credits-overlay');
       const aboutOverlay = document.getElementById('about-overlay');
 
       const overlayObjects = [...sceneLabels]; // sceneImages are now THREE.Mesh — handled separately
@@ -610,14 +609,12 @@ async function init() {
       // ── Core mode switch (used by nav and narrative) ───────────
       function _doSwitchMode(name, force = false) {
         if (name === 'map') name = 'recorded'; // "Map" nav item = recorded/home mode
-        const isCredits = name === 'credits';
         const isAbout = name === 'about';
         const isFatberg = name === 'fatberg';
 
-        creditsOverlay?.classList.toggle('visible', isCredits);
         aboutOverlay?.classList.toggle('visible', isAbout);
 
-        if (isCredits || isAbout) return;
+        if (isAbout) return;
 
         if (!force && name === _currentMode) return;
         _currentMode = name;
