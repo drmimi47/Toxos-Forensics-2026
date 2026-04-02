@@ -5,7 +5,7 @@ import { loadModel } from "./gltfLoader.js";
 import { loadAllCSV } from "./csvLoader.js";
 import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
 import { closeDetail, closeAllDetails, getDetailType } from "./detailPanel.js";
-import { addAllLabels, addAllImages } from "./labels.js";
+import { addAllLabels } from "./labels.js";
 import { buildTerrainSnapper } from "./terrainSnap.js";
 import { initNarrativePanel, setNarrativeContent, NARRATIVE_CONTENT } from "./narrativeText.js";
 import { mountPhaseViz } from "./phase-vizdata.js";
@@ -205,9 +205,10 @@ async function init() {
 
     setProgress(85, "Adding anchored labels to scene");
     const sceneLabels = addAllLabels(scene);
-
-    setProgress(88, "Adding overlay images to scene");
-    const sceneImages = addAllImages(scene, getCamera);
+    for (const label of sceneLabels) {
+      label.visible = false;
+      label.element.style.opacity = '0';
+    }
 
     if (csvResults.cso) {
       const el = document.getElementById("count-cso");
@@ -856,6 +857,17 @@ async function init() {
             // Heading-only section: card centered inside the model window, no text block below
             section.classList.add('narrative-scroll-section--intro');
             modelWindow.appendChild(card);
+
+            // Explore frame overlay with close button (phases 5 & 8)
+            const exploreFrame = document.createElement('div');
+            exploreFrame.className = 'explore-frame';
+            const exploreClose = document.createElement('button');
+            exploreClose.className = 'explore-frame-close';
+            exploreClose.setAttribute('aria-label', 'Exit explore mode');
+            exploreClose.textContent = 'X';
+            exploreFrame.appendChild(exploreClose);
+            modelWindow.appendChild(exploreFrame);
+
             section.appendChild(modelWindow);
           } else {
             const body = document.createElement('div');
@@ -938,6 +950,14 @@ async function init() {
           setControlsInteraction(true, true, true);
           section.classList.add('explore-mode-active');
 
+          // Show anchored labels only during explore mode.
+          for (const label of sceneLabels) {
+            label.visible = true;
+            label.element.style.transition = 'opacity 300ms ease';
+            label.element.style.color = '#ffffff';
+            requestAnimationFrame(() => { label.element.style.opacity = '0.75'; });
+          }
+
           // Subtle zoom nudge to signal the model is now interactive.
           setZoom(homeZoom * (CONFIG.camera.exploreZoom ?? 1.25) * 1.06);
 
@@ -1010,6 +1030,13 @@ async function init() {
             }, 400);
           }
 
+          // Hide anchored labels on explore exit.
+          for (const label of sceneLabels) {
+            label.element.style.transition = 'opacity 300ms ease';
+            label.element.style.opacity = '0';
+          }
+          setTimeout(() => { for (const label of sceneLabels) label.visible = false; }, 320);
+
           // Gently tween camera + controls back to the state before explore was activated.
           if (_exploreCamSnapshot) {
             const snap = _exploreCamSnapshot;
@@ -1064,6 +1091,17 @@ async function init() {
           });
           mw.addEventListener('pointerenter', () => { if (_activeExploreSection === section) _mouseInExplore = true; });
           mw.addEventListener('pointerleave', () => { if (_activeExploreSection === section) _mouseInExplore = false; });
+        });
+
+        // Close button on explore frame
+        page.querySelectorAll('.explore-frame-close').forEach(btn => {
+          btn.addEventListener('pointerdown', e => e.stopPropagation());
+          btn.addEventListener('click', () => deactivateExplore());
+        });
+
+        // ESC key exits explore mode
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape') deactivateExplore();
         });
 
         // Block page scroll only when ctrl+scroll is used inside the active explore window.
