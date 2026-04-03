@@ -148,9 +148,39 @@ export async function loadCSVPoints(scene, csvPath, color, darkColor, label) {
 }
 
 export async function loadAllCSV(scene) {
-  const results = {};
-  for (const [key, cfg] of Object.entries(CONFIG.csvFiles)) {
-    results[key] = await loadCSVPoints(scene, cfg.path, cfg.color, cfg.darkColor, cfg.label);
+  const entries = Object.entries(CONFIG.csvFiles);
+  const loaded = await Promise.all(
+    entries.map(([, cfg]) => loadCSVPoints(scene, cfg.path, cfg.color, cfg.darkColor, cfg.label))
+  );
+  return Object.fromEntries(entries.map(([key], i) => [key, loaded[i]]));
+}
+
+// Lightweight sampler for polygon-only datasets (showPoints:false).
+// Fetches the CSV and returns a sample of scene-space {x, z} coords without
+// creating any Three.js objects — avoids blocking the main thread on large files.
+export async function sampleCSVCoords(csvPath, maxSamples = 250) {
+  const response = await fetch(csvPath);
+  const text = await response.text();
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const xi = headers.indexOf('X');
+  const yi = headers.indexOf('Y');
+  if (xi < 0 || yi < 0) return [];
+
+  const ft2m = CONFIG.feetToMeters;
+  const off  = CONFIG.originOffset;
+  const step = Math.max(1, Math.floor((lines.length - 1) / maxSamples));
+  const coords = [];
+
+  for (let i = 1; i < lines.length; i += step) {
+    const cols = lines[i].split(',');
+    const x = parseFloat(cols[xi]);
+    const y = parseFloat(cols[yi]);
+    if (!Number.isNaN(x) && !Number.isNaN(y)) {
+      coords.push({ x: x * ft2m - off.x, z: -(y * ft2m) - off.z });
+    }
   }
-  return results;
+  return coords;
 }

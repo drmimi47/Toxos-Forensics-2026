@@ -2,7 +2,7 @@ import * as THREE from "three";
 import CONFIG from "../config/config.js";
 import { createViewer } from "./viewer.js";
 import { loadModel } from "./gltfLoader.js";
-import { loadAllCSV, loadCSVPoints } from "./csvLoader.js";
+import { loadAllCSV, loadCSVPoints, sampleCSVCoords } from "./csvLoader.js";
 import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
 import { closeDetail, closeAllDetails, getDetailType } from "./detailPanel.js";
 import { addAllLabels } from "./labels.js";
@@ -198,16 +198,26 @@ async function init() {
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
     const csvResults = await loadAllCSV(scene);
 
-    // Phase-specific datasets (hidden by default, shown only on their assigned phases).
-    const phaseDatasetResults = [];
-    for (const ds of CONFIG.phaseDatasets) {
-      const result = await loadCSVPoints(scene, ds.path, ds.color, ds.darkColor, ds.label);
-      result.group.visible = false;
-      result.material.opacity = 0;
-      result._phases = ds.phases;
-      result._showPoints = ds.showPoints !== false; // default true; false = polygon-only dataset
-      phaseDatasetResults.push(result);
-    }
+    // Phase-specific datasets — loaded in parallel.
+    // Polygon-only datasets (showPoints:false) use sampleCSVCoords instead of
+    // creating thousands of invisible sprites, avoiding the main-thread block.
+    setProgress(81, "Loading phase-specific datasets");
+    const phaseDatasetResults = await Promise.all(
+      CONFIG.phaseDatasets.map(async ds => {
+        if (ds.showPoints === false) {
+          // No sprites needed — sample coords for terrain-height averaging only.
+          const coords = await sampleCSVCoords(ds.path);
+          return { group: { children: [], visible: false }, material: { opacity: 0 },
+                   _coords: coords, _phases: ds.phases, _showPoints: false };
+        }
+        const result = await loadCSVPoints(scene, ds.path, ds.color, ds.darkColor, ds.label);
+        result.group.visible = false;
+        result.material.opacity = 0;
+        result._phases = ds.phases;
+        result._showPoints = true;
+        return result;
+      })
+    );
 
     setProgress(83, "Snapping data points to terrain surface");
     scene.updateMatrixWorld(true);
@@ -216,12 +226,12 @@ async function init() {
       snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
     }
     for (const result of phaseDatasetResults) {
-      snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
+      if (result.group.children.length > 0)
+        snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
     }
 
     // Phase-specific polygon layers (hidden by default, shown only on their assigned phases).
-    // Height is set to the average snapped Y of the matching point dataset (same path),
-    // so the fill plane sits at the same elevation as the terrain-snapped markers.
+    // Height is derived from sampled coords terrain-snapped on the fly (no sprites needed).
     const phasePolygonGroups = [];
     for (let i = 0; i < CONFIG.phasePolygons.length; i++) {
       const pg = CONFIG.phasePolygons[i];
@@ -229,9 +239,20 @@ async function init() {
         (_, j) => CONFIG.phaseDatasets[j].path === pg.path
       );
       let avgY = CONFIG.marker.heightOffset;
-      if (matchingDataset && matchingDataset.group.children.length > 0) {
-        const sprites = matchingDataset.group.children;
-        avgY = sprites.reduce((sum, s) => sum + s.position.y, 0) / sprites.length;
+      if (matchingDataset) {
+        if (matchingDataset._showPoints && matchingDataset.group.children.length > 0) {
+          // Point dataset: average snapped sprite Y values.
+          const sprites = matchingDataset.group.children;
+          avgY = sprites.reduce((sum, s) => sum + s.position.y, 0) / sprites.length;
+        } else if (matchingDataset._coords?.length > 0) {
+          // Polygon-only dataset: raycast the sampled coords directly.
+          const ys = matchingDataset._coords
+            .map(c => { const tmp = { position: new THREE.Vector3(c.x, 0, c.z), userData: {} }; return tmp; });
+          snapToTerrain(ys, 0);
+          const hits = ys.filter(s => s.userData.terrainY !== undefined);
+          if (hits.length > 0)
+            avgY = hits.reduce((sum, s) => sum + s.position.y, 0) / hits.length;
+        }
       }
       const group = await loadPolygons(scene, pg.path, pg.color, pg.opacity, avgY, pg.outline ?? false);
       group._phases = pg.phases;
@@ -739,13 +760,15 @@ async function init() {
         [0]:  { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
         [1]:  { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: false },
         [2]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true  },
-        [3]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: true,  narrativeKey: 'phase-3', dissElsOpacity: '0', sceneImages: true  },
+        [3]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: true,  narrativeKey: 'phase-3',   dissElsOpacity: '0', sceneImages: true  },
+        [11]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-3-5', dissElsOpacity: '0', sceneImages: null  },
         [4]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-4', dissElsOpacity: '0', sceneImages: null  },
         [5]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
         [6]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
-        [7]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: true,  allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7',   dissElsOpacity: '0', sceneImages: true  },
-        [9]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7-5', dissElsOpacity: '0', sceneImages: null  },
-        [8]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,        dissElsOpacity: '0', sceneImages: null  },
+        [7]:  { mode: 'remediated', isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: true,  narrativeKey: 'phase-7',   dissElsOpacity: '1', sceneImages: null  },
+        [9]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7-5',  dissElsOpacity: '0', sceneImages: null  },
+        [10]: { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7-75', dissElsOpacity: '0', sceneImages: null  },
+        [8]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,         dissElsOpacity: '0', sceneImages: null  },
       };
 
       function _applyPhase(phase) {
@@ -917,13 +940,15 @@ async function init() {
           { key: 'phase-2-a', phase: 2, subPhase: 0 }, //CSO
           { key: 'phase-2-b', phase: 2, subPhase: 1 }, //NPDES
           { key: 'phase-2-c', phase: 2, subPhase: 2 }, //RCRA
-          { key: 'phase-3',   phase: 3  }, //all groups
+          { key: 'phase-3',   phase: 3  }, //Sea Level Rise
+          { key: 'phase-3-5', phase: 11 }, //Neighborhood Health: Indoor Complaints Map
           { key: 'phase-4',   phase: 4  }, //Fatberg
           { key: 'phase-5',   phase: 5  }, //Explore Model
           { key: 'phase-6',   phase: 6  }, //Title
           { key: 'phase-7',   phase: 7  }, //Remediation
-          { key: 'phase-7-5', phase: 9  }, //BOA: Brownfield Opportunity Areas
-          { key: 'phase-8',   phase: 8  }, //Explore Model
+          { key: 'phase-7-5',  phase: 9  }, //BOA: Brownfield Opportunity Areas
+          { key: 'phase-7-75', phase: 10 }, //NYC's Greenstreets program
+          { key: 'phase-8',    phase: 8  }, //Explore Model
         ];
 
         const page = document.createElement('div');
@@ -1232,18 +1257,20 @@ async function init() {
         // Hide canvas initially — scroll handler reveals it after the title screen.
         viewerContainer.style.opacity = '0';
         const { min: tMin } = getTiltInfo();
-        const modelWindows = Array.from(page.querySelectorAll('.narrative-model-window'));
 
-        // Precompute model-window page-offsets so the scroll handler never calls
+        // Precompute section page-offsets so the scroll handler never calls
         // getBoundingClientRect() (which forces layout) on every scroll event.
-        let winTops = [];
+        const sectionEls = Array.from(page.querySelectorAll('.narrative-scroll-section'));
+        let winTops = [];  // section tops — used by lift zone + footer scroll
+        let secTops = [];  // same array, alias for clarity
         let maxScroll = 0;
         function _precompute() {
-          winTops = modelWindows.map(win => {
-            let top = 0, el = win;
-            while (el && el !== document.body) { top += el.offsetTop; el = el.offsetParent; }
+          winTops = sectionEls.map(el => {
+            let top = 0, cur = el;
+            while (cur && cur !== document.body) { top += cur.offsetTop; cur = cur.offsetParent; }
             return top;
           });
+          secTops = winTops;
           maxScroll = Math.max(0, page.scrollHeight - window.innerHeight);
         }
         _precompute();
@@ -1253,14 +1280,12 @@ async function init() {
           const scrollY = window.scrollY;
           const vh = window.innerHeight;
 
-          // Find the model window with the most pixels visible — no DOM reads,
-          // uses precomputed winTops offsets.
-          let activeIdx = -1;
-          let bestVisible = -Infinity;
-          for (let i = 0; i < winTops.length; i++) {
-            const top = winTops[i] - scrollY;
-            const vis = Math.min(top + vh, vh) - Math.max(top, 0);
-            if (vis > bestVisible) { bestVisible = vis; activeIdx = i; }
+          // Active section = last one whose top has crossed the viewport midpoint.
+          // This fires exactly when the section's debug label passes the centre of the screen.
+          const mid = scrollY + vh * 0.5;
+          let activeIdx = 0;
+          for (let i = 0; i < secTops.length; i++) {
+            if (secTops[i] <= mid) activeIdx = i;
           }
 
           // Canvas always visible — model shows in top-down for phase 0, transitions to home in phase 1.
@@ -1278,16 +1303,17 @@ async function init() {
           // between the midpoint of phase-3 and the start of phase-4.
           // Hold activeIdx at phase-3 during the lift so _applyPhase(4) (and its
           // fadeOverlays(false)) doesn't fire until the groups are already up.
-          const P3_IDX = 5, P4_IDX = 6;
+          const P3_IDX = SECTIONS.findIndex(s => s.key === 'phase-3');
+          const P4_IDX = SECTIONS.findIndex(s => s.key === 'phase-4');
           let inLiftZone = false;
           let liftT = 0;
-          if (winTops.length > P4_IDX) {
+          if (P3_IDX >= 0 && P4_IDX >= 0 && winTops.length > P4_IDX) {
             const liftStart = winTops[P3_IDX] + (winTops[P4_IDX] - winTops[P3_IDX]) * 0.5;
             const liftEnd   = winTops[P4_IDX];
             if (scrollY >= liftStart && scrollY < liftEnd && currentPhase !== 4) {
               inLiftZone = true;
               liftT = (scrollY - liftStart) / (liftEnd - liftStart);
-              if (activeIdx === P4_IDX) activeIdx = P3_IDX;
+              if (activeIdx === P4_IDX && currentPhase === 3) activeIdx = P3_IDX;
             }
           }
 

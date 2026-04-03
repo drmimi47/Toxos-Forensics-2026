@@ -24,15 +24,19 @@ const CONFIG = {
   // Phase-specific datasets — each only shown on the listed phase numbers.
   // To add a new dataset: add an entry here with its path, color, label, and phases array.
   phaseDatasets: [
-    { path: './data/boa_planningareas.csv', color: 0xA020F0, darkColor: 0xA020F0, label: 'BOA', phases: [9], showPoints: false },
-    { path: './data/slr_100years.csv',      color: 0xFF6600, darkColor: 0xFF6600, label: 'SLR', phases: [3], showPoints: false },
+    { path: './data/boa_planningareas.csv',  color: 0xA020F0, darkColor: 0xA020F0, label: 'BOA',          phases: [9],  showPoints: false },
+    { path: './data/slr_100years.csv',       color: 0xFF6600, darkColor: 0xFF6600, label: 'SLR',          phases: [3],  showPoints: false },
+    { path: './data/greenstreets_data.csv',  color: 0x00FF44, darkColor: 0x00FF44, label: 'Greenstreets', phases: [10], showPoints: false },
+    { path: './data/dohmh_data.csv',          color: 0xFF69B4, darkColor: 0xFF69B4, label: 'DOHMH',        phases: [11], showPoints: true  },
+    { path: './data/e-designations_data.csv', color: 0x8B4513, darkColor: 0x8B4513, label: 'E-Designations', phases: [7],  showPoints: true  },
   ],
 
   // Phase-specific polygon layers — reconstructed from vertex CSV files.
   // To add a new polygon layer: append an entry with path, color, opacity, outline, and phases.
   phasePolygons: [
-    { path: './data/boa_planningareas.csv', color: 0xA020F0, opacity: 0.3, outline: true, phases: [9] },
-    { path: './data/slr_100years.csv',      color: 0xFF6600, opacity: 0.3, outline: true, phases: [3] },
+    { path: './data/boa_planningareas.csv',  color: 0xA020F0, opacity: 0.3, outline: true, phases: [9]  },
+    { path: './data/slr_100years.csv',       color: 0xFF6600, opacity: 0.3, outline: true, phases: [3]  },
+    { path: './data/greenstreets_data.csv',  color: 0x00FF44, opacity: 0.3, outline: true, phases: [10] },
   ],
 
   marker: {

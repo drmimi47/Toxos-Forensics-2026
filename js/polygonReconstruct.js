@@ -116,7 +116,11 @@ export async function loadPolygons(scene, csvPath, color, opacity = 0.35, height
   group._fillOpacity = opacity;
   group._lineOpacity = lineMaterial ? Math.min(opacity + 0.4, 1.0) : 0;
 
+  // Yield one microtask between features so the browser can breathe on large datasets.
+  const _yield = () => new Promise(r => setTimeout(r, 0));
+
   for (const [, parts] of features) {
+    await _yield();
     for (const [, rings] of parts) {
       // Sort ring keys so outer ring (0) is always first
       const sortedRings = [...rings.entries()].sort(([a], [b]) => a - b);
