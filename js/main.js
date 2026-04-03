@@ -2,7 +2,7 @@ import * as THREE from "three";
 import CONFIG from "../config/config.js";
 import { createViewer } from "./viewer.js";
 import { loadModel } from "./gltfLoader.js";
-import { loadAllCSV } from "./csvLoader.js";
+import { loadAllCSV, loadCSVPoints } from "./csvLoader.js";
 import { setupTooltips, frameBoundingBox, animateIntro } from "./utils.js";
 import { closeDetail, closeAllDetails, getDetailType } from "./detailPanel.js";
 import { addAllLabels } from "./labels.js";
@@ -10,6 +10,7 @@ import { buildTerrainSnapper } from "./terrainSnap.js";
 import { initNarrativePanel, setNarrativeContent, NARRATIVE_CONTENT } from "./narrativeText.js";
 import { mountPhaseViz } from "./phase-vizdata.js";
 import { mountNarrativeTimeline } from "./narrativeTimeline.js";
+import { loadPolygons } from "./polygonReconstruct.js";
 
 // Per-mode visual settings. Edit these values to retheme each submenu independently.
 // bg:           hex color for the 3D viewport background.
@@ -197,11 +198,44 @@ async function init() {
     setProgress(80, "Loading CSV data: CSO, NPDES, RCRA");
     const csvResults = await loadAllCSV(scene);
 
+    // Phase-specific datasets (hidden by default, shown only on their assigned phases).
+    const phaseDatasetResults = [];
+    for (const ds of CONFIG.phaseDatasets) {
+      const result = await loadCSVPoints(scene, ds.path, ds.color, ds.darkColor, ds.label);
+      result.group.visible = false;
+      result.material.opacity = 0;
+      result._phases = ds.phases;
+      result._showPoints = ds.showPoints !== false; // default true; false = polygon-only dataset
+      phaseDatasetResults.push(result);
+    }
+
     setProgress(83, "Snapping data points to terrain surface");
     scene.updateMatrixWorld(true);
     const snapToTerrain = buildTerrainSnapper(topoMeshes);
     for (const result of Object.values(csvResults)) {
       snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
+    }
+    for (const result of phaseDatasetResults) {
+      snapToTerrain(result.group.children, CONFIG.marker.heightOffset);
+    }
+
+    // Phase-specific polygon layers (hidden by default, shown only on their assigned phases).
+    // Height is set to the average snapped Y of the matching point dataset (same path),
+    // so the fill plane sits at the same elevation as the terrain-snapped markers.
+    const phasePolygonGroups = [];
+    for (let i = 0; i < CONFIG.phasePolygons.length; i++) {
+      const pg = CONFIG.phasePolygons[i];
+      const matchingDataset = phaseDatasetResults.find(
+        (_, j) => CONFIG.phaseDatasets[j].path === pg.path
+      );
+      let avgY = CONFIG.marker.heightOffset;
+      if (matchingDataset && matchingDataset.group.children.length > 0) {
+        const sprites = matchingDataset.group.children;
+        avgY = sprites.reduce((sum, s) => sum + s.position.y, 0) / sprites.length;
+      }
+      const group = await loadPolygons(scene, pg.path, pg.color, pg.opacity, avgY, pg.outline ?? false);
+      group._phases = pg.phases;
+      phasePolygonGroups.push(group);
     }
 
     setProgress(85, "Adding anchored labels to scene");
@@ -705,12 +739,13 @@ async function init() {
         [0]:  { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
         [1]:  { mode: 'recorded',   isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: false },
         [2]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true  },
-        [3]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: true,  startDissLines: true,  narrativeKey: 'phase-3', dissElsOpacity: '0', sceneImages: true  },
+        [3]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: true,  narrativeKey: 'phase-3', dissElsOpacity: '0', sceneImages: true  },
         [4]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-4', dissElsOpacity: '0', sceneImages: null  },
         [5]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
         [6]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
-        [7]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: true,  allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7', dissElsOpacity: '0', sceneImages: true  },
-        [8]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
+        [7]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: true,  allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7',   dissElsOpacity: '0', sceneImages: true  },
+        [9]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-7-5', dissElsOpacity: '0', sceneImages: null  },
+        [8]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,        dissElsOpacity: '0', sceneImages: null  },
       };
 
       function _applyPhase(phase) {
@@ -774,6 +809,74 @@ async function init() {
           }));
         }
 
+        // Phase-specific datasets: fade in/out matching the overlay FADE_MS timing.
+        // Datasets with showPoints:false skip point rendering (polygon fill/outline used instead).
+        for (const ds of phaseDatasetResults) {
+          if (!ds._showPoints) continue;
+          const active    = ds._phases.includes(phase);
+          const wasActive = ds._phases.includes(prevPhase);
+          if (!active && !wasActive) continue;
+
+          if (active) {
+            ds.group.visible = true;
+            const startOp = ds.material.opacity;
+            const t0 = performance.now();
+            (function tick() {
+              const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+              ds.material.opacity = startOp + (1 - startOp) * p;
+              if (p < 1) requestAnimationFrame(tick);
+            })();
+          } else {
+            const startOp = ds.material.opacity;
+            const t0 = performance.now();
+            (function tick() {
+              const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+              ds.material.opacity = startOp * (1 - p);
+              if (p < 1) {
+                requestAnimationFrame(tick);
+              } else {
+                ds.group.visible = false;
+              }
+            })();
+          }
+        }
+
+        // Phase-specific polygon layers: fade in/out matching the overlay FADE_MS timing.
+        for (const pg of phasePolygonGroups) {
+          const active    = pg._phases.includes(phase);
+          const wasActive = pg._phases.includes(prevPhase);
+          if (!active && !wasActive) continue;
+
+          if (active) {
+            pg.visible = true;
+            const fillTarget = pg._fillOpacity;
+            const lineTarget = pg._lineOpacity;
+            const t0 = performance.now();
+            const fillStart = pg._fillMaterial.opacity;
+            const lineStart = pg._lineMaterial ? pg._lineMaterial.opacity : 0;
+            (function tick() {
+              const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+              pg._fillMaterial.opacity = fillStart + (fillTarget - fillStart) * p;
+              if (pg._lineMaterial) pg._lineMaterial.opacity = lineStart + (lineTarget - lineStart) * p;
+              if (p < 1) requestAnimationFrame(tick);
+            })();
+          } else {
+            const fillStart = pg._fillMaterial.opacity;
+            const lineStart = pg._lineMaterial ? pg._lineMaterial.opacity : 0;
+            const t0 = performance.now();
+            (function tick() {
+              const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+              pg._fillMaterial.opacity = fillStart * (1 - p);
+              if (pg._lineMaterial) pg._lineMaterial.opacity = lineStart * (1 - p);
+              if (p < 1) {
+                requestAnimationFrame(tick);
+              } else {
+                pg.visible = false;
+              }
+            })();
+          }
+        }
+
         // Camera transitions for the opening sequence.
         if (phase === 0) goDissectedTopDown(); // title: top-down view
         if (phase === 1) goHome();             // blank model: animate to home pose
@@ -819,6 +922,7 @@ async function init() {
           { key: 'phase-5',   phase: 5  }, //Explore Model
           { key: 'phase-6',   phase: 6  }, //Title
           { key: 'phase-7',   phase: 7  }, //Remediation
+          { key: 'phase-7-5', phase: 9  }, //BOA: Brownfield Opportunity Areas
           { key: 'phase-8',   phase: 8  }, //Explore Model
         ];
 
@@ -835,7 +939,7 @@ async function init() {
 
           const debugLabel = document.createElement('div');
           debugLabel.textContent = sec.key;
-          debugLabel.style.cssText = 'position:absolute;top:8px;left:12px;font-family:monospace;font-size:11px;color:rgba(255,255,255,0.5);z-index:999;pointer-events:none;';
+          debugLabel.style.cssText = 'position:absolute;top:8px;left:12px;font-family:monospace;font-size:11px;color:rgba(180,100,255,0.85);z-index:999;pointer-events:none;';
           section.style.position = 'relative';
           section.appendChild(debugLabel);
 

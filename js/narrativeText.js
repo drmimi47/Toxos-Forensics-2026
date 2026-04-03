@@ -20,7 +20,7 @@ export const NARRATIVE_CONTENT = {
   },
 
   'phase-3': {
-    heading: "Title Placeholder",
+    heading: "Sea Level Rise: 100-Year Floodplain",
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vehicula
        libero at urna pretium, nec ullamcorper justo viverra. Fusce tincidunt
@@ -90,6 +90,18 @@ export const NARRATIVE_CONTENT = {
 
   'phase-7': {
     heading: 'Placeholder Title',
+    body: [
+      `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in urna
+       a turpis vestibulum iaculis. Temporibus autem quibusdam et aut officiis
+       debitis aut rerum necessitatibus saepe eveniet.`,
+      `Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam
+       nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas
+       nulla pariatur.`,
+    ],
+  },
+
+  'phase-7-5': {
+    heading: 'BOA: Brownfield Opportunity Areas',
     body: [
       `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in urna
        a turpis vestibulum iaculis. Temporibus autem quibusdam et aut officiis

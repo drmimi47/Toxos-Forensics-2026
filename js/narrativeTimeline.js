@@ -7,8 +7,18 @@
 //   dotWraps.forEach((w, i) => w.classList.toggle('active', i === activeIdx));
 
 const PHASE_LABELS = [
-  'TOXICITY', 'CONTEXT', 'CSO', 'NPDES', 'RCRA',
-  'OVERVIEW', 'FATBERG', 'EXPLORE', 'REMEDIATION', 'RESPONSE', 'EXPLORE',
+  'TOXICITY',      // phase-0: title
+  'CONTEXT',       // phase-1: context
+  'CSO',           // phase-2-a: combined sewer overflow
+  'NPDES',         // phase-2-b: water discharge permits
+  'RCRA',          // phase-2-c: hazardous waste facilities
+  'SLR',           // phase-3: sea level rise 100-year floodplain
+  'FATBERG',       // phase-4: fatberg
+  'EXPLORE',       // phase-5: explore model
+  'REMEDIATION',   // phase-6: remediation title
+  'DETOXIFICATION',// phase-7: remediation body
+  'BOA',           // phase-7-5: brownfield opportunity areas
+  'EXPLORE',       // phase-8: explore model
 ];
 
 /**

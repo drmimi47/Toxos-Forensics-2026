@@ -14,11 +14,26 @@ const CONFIG = {
   // 1 US survey foot = 1200/3937 m ≈ 0.30480061 m
   feetToMeters: 0.30480061,
 
+  // Always-on datasets — loaded at startup, toggled by fadeOverlays per phase.
   csvFiles: {
-    cso: { path: './data/cso_2263_clipped.csv', color: 0x00FFFF, darkColor: 0xFF0000, label: 'CSO' },
-    npdes: { path: './data/npdes_2263_clipped.csv', color: 0xFF3800, darkColor: 0x00FF00, label: 'NPDES' },
-    rcra_2263_clipped: { path: './data/rcra_2263_clipped.csv', color: 0x515B28, darkColor: 0xB1C074, label: 'RCRA' }
+    cso:              { path: './data/cso_2263_clipped.csv',    color: 0x00FFFF, darkColor: 0xFF0000, label: 'CSO'   },
+    npdes:            { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, darkColor: 0x00FF00, label: 'NPDES' },
+    rcra_2263_clipped:{ path: './data/rcra_2263_clipped.csv',   color: 0x515B28, darkColor: 0xB1C074, label: 'RCRA'  },
   },
+
+  // Phase-specific datasets — each only shown on the listed phase numbers.
+  // To add a new dataset: add an entry here with its path, color, label, and phases array.
+  phaseDatasets: [
+    { path: './data/boa_planningareas.csv', color: 0xA020F0, darkColor: 0xA020F0, label: 'BOA', phases: [9], showPoints: false },
+    { path: './data/slr_100years.csv',      color: 0xFF6600, darkColor: 0xFF6600, label: 'SLR', phases: [3], showPoints: false },
+  ],
+
+  // Phase-specific polygon layers — reconstructed from vertex CSV files.
+  // To add a new polygon layer: append an entry with path, color, opacity, outline, and phases.
+  phasePolygons: [
+    { path: './data/boa_planningareas.csv', color: 0xA020F0, opacity: 0.3, outline: true, phases: [9] },
+    { path: './data/slr_100years.csv',      color: 0xFF6600, opacity: 0.3, outline: true, phases: [3] },
+  ],
 
   marker: {
     screenSize: 0.005, // size of point sprites in screen space (independent of zoom)
