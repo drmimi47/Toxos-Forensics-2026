@@ -884,6 +884,17 @@ body.narrative-scroll-mode .narrative-timeline {
   pointer-events: auto;
 }
 
+/* ── Voices Phase: Fuzzy Screen Effect ─────────────────────────────────── */
+body.voices-mode #viewer-container {
+  filter: blur(8px);
+  transition: filter 0.6s ease;
+}
+
+body.voices-mode .narrative-text-card {
+  position: relative;
+  z-index: 10;
+}
+
 .timeline-dot-wrap {
   display: flex;
   align-items: center;

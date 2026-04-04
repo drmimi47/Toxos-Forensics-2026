@@ -762,6 +762,7 @@ async function init() {
         [2]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: true,  allGroupsVisible: false, startDissLines: true,  narrativeKey: null,      dissElsOpacity: '1', sceneImages: true  },
         [3]:  { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: true,  narrativeKey: 'phase-3',   dissElsOpacity: '0', sceneImages: true  },
         [11]: { mode: 'dissected',  isDissected: true,  bodyClass: 'dissected-mode', overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-3-5', dissElsOpacity: '0', sceneImages: null  },
+        [12]: { mode: 'dissected',  isDissected: true,  bodyClass: 'voices-mode',    overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-3-75', dissElsOpacity: '0', sceneImages: null  },
         [4]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: 'phase-4', dissElsOpacity: '0', sceneImages: null  },
         [5]:  { mode: 'fatberg',    isDissected: false, bodyClass: 'fatberg-mode',   overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
         [6]:  { mode: 'remediated', isDissected: false, bodyClass: null,             overlays: false, allGroupsVisible: false, startDissLines: false, narrativeKey: null,      dissElsOpacity: '0', sceneImages: null  },
@@ -942,6 +943,7 @@ async function init() {
           { key: 'phase-2-c', phase: 2, subPhase: 2 }, //RCRA
           { key: 'phase-3',   phase: 3  }, //Sea Level Rise
           { key: 'phase-3-5', phase: 11 }, //Neighborhood Health: Indoor Complaints Map
+          { key: 'phase-3-75', phase: 12 }, //Voices
           { key: 'phase-4',   phase: 4  }, //Fatberg
           { key: 'phase-5',   phase: 5  }, //Explore Model
           { key: 'phase-6',   phase: 6  }, //Title

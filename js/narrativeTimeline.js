@@ -14,6 +14,7 @@ const PHASE_LABELS = [
   'RCRA',          // phase-2-c: hazardous waste facilities
   'SLR',           // phase-3: sea level rise 100-year floodplain
   'HEALTH',        // phase-3-5: neighborhood health indoor complaints
+  'VOICES',        // phase-3-75: voices
   'FATBERG',       // phase-4: fatberg
   'EXPLORE',       // phase-5: explore model
   'REMEDIATION',   // phase-6: remediation title

@@ -55,6 +55,18 @@ export const NARRATIVE_CONTENT = {
     ],
   },
 
+  'phase-3-75': {
+    heading: 'Voices',
+    body: [
+      `Lorem ipsum dolor sit amet, consectetur adipiscing elit. At vero eos et
+       accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium
+       voluptatum deleniti atque corrupti quos dolores.`,
+      `Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil
+       impedit quo minus id quod maxime placeat facere possimus, omnis voluptas
+       assumenda est, omnis dolor repellendus.`,
+    ],
+  },
+
   'phase-4': {
     heading: 'Visualizing Fatbergs',
     body: [

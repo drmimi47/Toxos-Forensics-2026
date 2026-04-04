@@ -47,6 +47,8 @@ export const VIZ_REGISTRY = {
   'phase-2-b': [],
   'phase-2-c': [],
   'phase-3':   [],
+  'phase-3-5': [],
+  'phase-3-75': [],
   'phase-4':   [],
   'phase-6':   [],
   'phase-7':   [],
