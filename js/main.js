@@ -803,8 +803,8 @@ async function init() {
             if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
           }
           setExplode(explodeGroups.map(() => 0));
-        } else if (phase === 2) {
-          // Sub-phases (CSO/NPDES/RCRA): keep all data points at ground level.
+        } else if (phase === 2 || phase === 5) {
+          // Sub-phases (CSO/NPDES/RCRA) and explore mode: keep all data points at ground level.
           setExplode(explodeGroups.map(() => 0));
         } else if (phase === 4) {
           // Coming from phase 3: fly datasets up to stacked heights as they fade out.
@@ -1030,17 +1030,20 @@ async function init() {
                 <div class="credits-list">
                   <span class="credits-label">Founders</span>
                   <span class="credits-name">Shannon Levkovitz</span>
-                  <span class="credits-name">Julio Viejo Romero-Mazariegos</span>
+                  <span class="credits-name">Julio Viejo</span>
                   <span class="credits-name">Patrick Rodriguez</span>
                   <span class="credits-name">Claire Galla</span>
                   <span class="credits-name">Samantha Nowak</span>
-                  <span class="credits-label">Contributors</span>
+                  <span class="credits-label">King</span>
                   <span class="credits-name">Benny Yang</span>
+                  <span class="credits-label">Contributors</span>
                   <span class="credits-name">Cole Chroman</span>
                   <span class="credits-name">Xiaodian Yi</span>
                   <span class="credits-label">Advisors</span>
                   <span class="credits-name">Amelyn Ng</span>
                   <span class="credits-name">Xiaoxi Chen</span>
+                  <span class="credits-name">Hart Mankin</span>
+                  <span class="credits-name">Lydia Kallipoliti</span>
                   <span class="credits-label">Guest Speakers</span>
                   <span class="credits-name">Christopher Swain</span>
                   <span class="credits-name">Mark Wasiuta</span>
@@ -1055,6 +1058,15 @@ async function init() {
         const { dotWraps: _dotWraps } = mountNarrativeTimeline(page, SECTIONS);
 
         // ── Explore Model sections (generalized) ──────────────────────────
+
+        // Datasets revealed only while the user is inside explore mode (not on scroll entry).
+        // datasetPhases: which phase numbers' phaseDatasets to show.
+        // polygonPhases: which phase numbers' phasePolygonGroups to show.
+        const EXPLORE_OVERLAY_CONFIG = {
+          'phase-5': { overlays: true,  datasetPhases: [3, 11], polygonPhases: [3]       },
+          'phase-8': { overlays: false, datasetPhases: [7, 9, 10], polygonPhases: [9, 10] },
+        };
+
         let _exploreActive = false;
         let _mouseInExplore = false;
         let _exploreForwardCleanup = null;
@@ -1151,11 +1163,76 @@ async function init() {
             mw.style.pointerEvents = '';
             mw.style.touchAction = '';
           };
+
+          // Fade in datasets specific to this explore section.
+          const _expCfg = EXPLORE_OVERLAY_CONFIG[section.dataset.sectionKey];
+          if (_expCfg) {
+            if (_expCfg.overlays) fadeOverlays(true);
+            for (const ds of phaseDatasetResults) {
+              if (!ds._showPoints) continue;
+              if (!ds._phases.some(p => _expCfg.datasetPhases.includes(p))) continue;
+              ds.group.visible = true;
+              const startOp = ds.material.opacity;
+              const t0 = performance.now();
+              (function tick() {
+                const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+                ds.material.opacity = startOp + (1 - startOp) * p;
+                if (p < 1) requestAnimationFrame(tick);
+              })();
+            }
+            for (const pg of phasePolygonGroups) {
+              if (!pg._phases.some(p => _expCfg.polygonPhases.includes(p))) continue;
+              pg.visible = true;
+              const fillTarget = pg._fillOpacity;
+              const lineTarget = pg._lineOpacity;
+              const fillStart = pg._fillMaterial.opacity;
+              const lineStart = pg._lineMaterial ? pg._lineMaterial.opacity : 0;
+              const t0 = performance.now();
+              (function tick() {
+                const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+                pg._fillMaterial.opacity = fillStart + (fillTarget - fillStart) * p;
+                if (pg._lineMaterial) pg._lineMaterial.opacity = lineStart + (lineTarget - lineStart) * p;
+                if (p < 1) requestAnimationFrame(tick);
+              })();
+            }
+          }
         }
 
         function deactivateExplore() {
           if (!_exploreActive) return;
           _exploreActive = false;
+
+          // Fade out datasets that were revealed for this explore section.
+          const _deactCfg = EXPLORE_OVERLAY_CONFIG[_activeExploreSection?.dataset.sectionKey];
+          if (_deactCfg) {
+            if (_deactCfg.overlays) fadeOverlays(false);
+            for (const ds of phaseDatasetResults) {
+              if (!ds._showPoints) continue;
+              if (!ds._phases.some(p => _deactCfg.datasetPhases.includes(p))) continue;
+              const startOp = ds.material.opacity;
+              const t0 = performance.now();
+              (function tick() {
+                const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+                ds.material.opacity = startOp * (1 - p);
+                if (p < 1) requestAnimationFrame(tick);
+                else ds.group.visible = false;
+              })();
+            }
+            for (const pg of phasePolygonGroups) {
+              if (!pg._phases.some(p => _deactCfg.polygonPhases.includes(p))) continue;
+              const fillStart = pg._fillMaterial.opacity;
+              const lineStart = pg._lineMaterial ? pg._lineMaterial.opacity : 0;
+              const t0 = performance.now();
+              (function tick() {
+                const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+                pg._fillMaterial.opacity = fillStart * (1 - p);
+                if (pg._lineMaterial) pg._lineMaterial.opacity = lineStart * (1 - p);
+                if (p < 1) requestAnimationFrame(tick);
+                else pg.visible = false;
+              })();
+            }
+          }
+
           setControlsInteraction(false, false, false);
           setParallaxEnabled(true);
           _activeExploreSection?.classList.remove('explore-mode-active');
