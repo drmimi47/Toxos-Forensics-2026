@@ -238,7 +238,7 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
 
     if (event.clientX > canvasRect.right) {
       if (viewerCanvas) viewerCanvas.style.cursor = '';
-      if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; }
+      if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; window.dispatchEvent(new CustomEvent('sprite-hover', { detail: null })); }
       if (!selectedSprite && activeType !== null) resetAllGroups();
       tooltipEl.classList.add('hidden');
       _crossTarget = 0;
@@ -288,6 +288,11 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
         if (hoveredSprite) animating.add(hoveredSprite);
         hoveredSprite = hit.object;
         animating.add(hoveredSprite);
+        const _hvGroup = hit.object.parent;
+        const _hvSprites = _hvGroup.children.filter(c => c.userData?.type);
+        window.dispatchEvent(new CustomEvent('sprite-hover', {
+          detail: { index: _hvSprites.indexOf(hit.object), total: _hvSprites.length, type: hit.object.userData.type }
+        }));
       }
 
       if (modelBox && getDissected?.()) {
@@ -304,7 +309,7 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
       }
     } else {
       if (canvas && !_snapX) canvas.style.cursor = '';
-      if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; }
+      if (hoveredSprite) { animating.add(hoveredSprite); hoveredSprite = null; window.dispatchEvent(new CustomEvent('sprite-hover', { detail: null })); }
       if (!selectedSprite && activeType !== null) resetAllGroups();
       tooltipEl.classList.add('hidden');
       _crossTarget = 0;

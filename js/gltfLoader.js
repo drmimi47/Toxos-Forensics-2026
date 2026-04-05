@@ -227,8 +227,19 @@ export async function loadModel(scene, onProgress) {
           }
         };
 
+        // Set opacity on all model meshes (terrain top, terrain sides, buildings).
+        // Call with 1 to restore full opacity, or e.g. 0.25 for 75% transparent.
+        const allModelMats = [...topoTopMats, ...topoSideMats, ...buildingMats];
+        const setModelOpacity = (opacity) => {
+          for (const mat of allModelMats) {
+            mat.transparent = opacity < 1;
+            mat.opacity = opacity;
+            mat.needsUpdate = true;
+          }
+        };
+
         console.log('[gltfLoader] Model loaded and offset applied.');
-        resolve({ model: wrapper, setModeProgress, topoMeshes });
+        resolve({ model: wrapper, setModeProgress, topoMeshes, setModelOpacity });
       },
       (progress) => {
         if (progress.total && onProgress) {

@@ -699,7 +699,10 @@ body.narrative-scroll-mode .diss-panels--left {
 [data-section-key="phase-2-b"] .narrative-text-block,
 [data-section-key="phase-2-c"] .narrative-text-block,
 [data-section-key="phase-3"] .narrative-text-block,
-[data-section-key="phase-3-5"] .narrative-text-block {
+[data-section-key="phase-3-5"] .narrative-text-block,
+[data-section-key="phase-7"] .narrative-text-block,
+[data-section-key="phase-7-5"] .narrative-text-block,
+[data-section-key="phase-7-75"] .narrative-text-block {
   position: absolute;
   left: 0;
   width: 50%;
@@ -720,7 +723,8 @@ body.narrative-scroll-mode .diss-panels--left {
   justify-content: center;
 }
 
-[data-section-key="phase-1"] .narrative-text-card {
+[data-section-key="phase-1"] .narrative-text-card,
+[data-section-key="phase-4"] .narrative-text-card {
   background: rgba(255, 255, 255, 0.01);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -839,6 +843,22 @@ body.narrative-scroll-mode .diss-panels--left {
   -webkit-user-select: text;
 }
 
+/* ── Geopoint counter ───────────────────────────────────────────────────── */
+.geopoint-counter-wrap {
+  margin-top: 16px;
+  padding-left: 0;
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  opacity: 0.65;
+}
+
+.geopoint-count {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Explore Model trigger (phase-2aa) ──────────────────────────────────── */
 .explore-model-trigger {
   cursor: pointer;
@@ -857,6 +877,14 @@ body.narrative-scroll-mode .diss-panels--left {
 .explore-mode-active .explore-model-trigger {
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+/* Hide the entire heading (which carries the green background-color) when
+   explore mode activates — fading just the inner span left an empty green block */
+.explore-mode-active .narrative-scroll-section--intro .narrative-heading,
+.narrative-scroll-section--intro.explore-mode-active .narrative-heading {
+  opacity: 0;
   transition: opacity 0.3s;
 }
 
@@ -905,6 +933,58 @@ body.narrative-scroll-mode .diss-panels--left {
 .explore-mode-active .explore-frame-close {
   opacity: 1;
   pointer-events: auto;
+}
+
+.explore-hover-info {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+/* ── Explore legend ──────────────────────────────────────────────────────── */
+.explore-legend {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  pointer-events: auto;
+}
+
+.explore-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+.explore-legend-item--off {
+  opacity: 0.35;
+}
+
+.explore-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* ── Narrative Timeline ──────────────────────────────────────────────────── */

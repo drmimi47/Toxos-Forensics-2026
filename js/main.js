@@ -164,7 +164,7 @@ async function init() {
   try {
     setProgress(10, "Loading 3D model geometry and textures");
 
-    const { model, setModeProgress, topoMeshes } = await loadModel(
+    const { model, setModeProgress, topoMeshes, setModelOpacity } = await loadModel(
       scene,
       (pct) => {
         if (pct < 30) setProgress(10 + pct * 0.2, `Loading model geometry: ${Math.round(pct)}%`);
@@ -194,8 +194,8 @@ async function init() {
     modelBox.getCenter(_modelCenter);
     _fatbergCenter.y = modelBox.max.y + _fatbergRadius + 20;
     const fatbergMat = new THREE.MeshStandardMaterial({
-      color: 0xb8860b,
-      emissive: 0x3a2800,
+      color: 0xA6B86A,
+      emissive: 0x2a3018,
       transparent: true,
       opacity: 0,
       roughness: 0.75,
@@ -218,6 +218,15 @@ async function init() {
     // Used to seed the inverted scroll-to-tilt mapping in the Start sequence.
     const _homeOffset = getCamera().position.clone().sub(controls.target);
     const homeTheta = Math.acos(THREE.MathUtils.clamp(_homeOffset.y / _homeOffset.length(), -1, 1));
+
+    // Flattened home offset used by the fatberg scrub tilt: same XZ direction but
+    // reduced Y (0.75×) so the camera looks more head-on at the sphere by scrub end.
+    // Mirrors the goFatbergView calculation in viewer.js.
+    const _fatbergFlatOffset = new THREE.Vector3(
+      _homeOffset.x,
+      _homeOffset.y * 0.75,
+      _homeOffset.z
+    ).normalize().multiplyScalar(_homeOffset.length());
 
 
 
@@ -592,6 +601,9 @@ async function init() {
 
       let zoomTarget = homeZoom;
       let zoomRafId = null;
+      // True while a programmatic zoom tween is running — prevents OrbitControls
+      // damping / goHome change events from freezing the tween at a halfway value.
+      let _zoomTweenActive = false;
 
       function tickZoom() {
         const camera = getCamera();
@@ -600,6 +612,7 @@ async function init() {
           camera.zoom = zoomTarget;
           camera.updateProjectionMatrix();
           zoomRafId = null;
+          _zoomTweenActive = false;
         } else {
           camera.zoom = next;
           camera.updateProjectionMatrix();
@@ -609,6 +622,7 @@ async function init() {
 
       function setZoom(z) {
         zoomTarget = z;
+        _zoomTweenActive = true;
         if (zoomRafId) cancelAnimationFrame(zoomRafId);
         zoomRafId = requestAnimationFrame(tickZoom);
       }
@@ -618,12 +632,15 @@ async function init() {
           cancelAnimationFrame(zoomRafId);
           zoomRafId = null;
         }
+        _zoomTweenActive = false;
         if (syncToCurrent) zoomTarget = getCamera().zoom;
       }
 
-      // Cancel programmatic zoom on manual scroll so tickZoom() never fights OrbitControls.
+      // Cancel programmatic zoom on manual user interaction so tickZoom() never
+      // fights OrbitControls. Skipped while a tween is intentionally running so
+      // that goHome / damping change-events can't freeze the zoom mid-transition.
       controls.addEventListener('change', () => {
-        stopZoomTween(true);
+        if (!_zoomTweenActive) stopZoomTween(true);
       });
 
       const aboutOverlay = document.getElementById('about-overlay');
@@ -858,6 +875,27 @@ async function init() {
           }));
         }
 
+        // Model opacity: fade to 25% on phase 10 (phase-7.75) so polygon data
+        // is visible through the terrain, restore to full when leaving.
+        const MODEL_DIM_OPACITY = 0.25;
+        if (phase === 10) {
+          let startOp = 1;
+          const t0 = performance.now();
+          (function tick() {
+            const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+            setModelOpacity(startOp + (MODEL_DIM_OPACITY - startOp) * p);
+            if (p < 1) requestAnimationFrame(tick);
+          })();
+        } else if (prevPhase === 10) {
+          const startOp = MODEL_DIM_OPACITY;
+          const t0 = performance.now();
+          (function tick() {
+            const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+            setModelOpacity(startOp + (1 - startOp) * p);
+            if (p < 1) requestAnimationFrame(tick);
+          })();
+        }
+
         // Fatberg sphere: fade in on phase 4, fade out when leaving phase 4.
         if (phase === 4) {
           fatbergSphere.visible = true;
@@ -955,13 +993,19 @@ async function init() {
           goHome();
         }
 
-        // Zoom in on explore-model interstitials, zoom back out when leaving.
+        // Remediation phases: guarantee home camera so the right-shift lands
+        // in the same position as phases 3/3.5 (any residual fatberg/explore
+        // camera drift is cleared before the frustum shift fires).
+        if (phase === 7 || phase === 9 || phase === 10) goHome();
+
+        // Every phase explicitly owns its zoom so fast scrolling that skips
+        // prevPhase checks can never leave zoom stuck at an intermediate value.
         const _nz = homeZoom * (CONFIG.camera.narrativeZoom ?? 0.92);
         if (phase === 5 || phase === 8) {
           setZoom(homeZoom * (CONFIG.camera.exploreZoom ?? 1.25));
-        } else if (prevPhase === 5 || prevPhase === 8) {
-          setZoom(_nz);
-        } else if (prevPhase === 4 && phase !== 4) {
+        } else if (phase !== 4) {
+          // All non-fatberg phases restore narrative zoom.
+          // Phase 4 is excluded — the fatberg scrub drives camera.zoom directly.
           setZoom(_nz);
         }
       }
@@ -987,6 +1031,15 @@ async function init() {
         _startScrollNarrative();
       };
       function _startScrollNarrative() {
+        // Geopoint counts per phase — populated from loaded CSV data.
+        const GEOPOINT_COUNTS = {
+          'phase-2-a': csvResults.cso?.group.children.length ?? 0,
+          'phase-2-b': csvResults.npdes?.group.children.length ?? 0,
+          'phase-2-c': csvResults.rcra_2263_clipped?.group.children.length ?? 0,
+          'phase-3-5': phaseDatasetResults.find(r => r._phases?.includes(11))?.group.children.length ?? 0,
+          'phase-7':   phaseDatasetResults.find(r => r._phases?.includes(7))?.group.children.length ?? 0,
+        };
+
         const SECTIONS = [
           { key: 'phase-0',   phase: 0  }, //title
           { key: 'phase-1',   phase: 1  }, //context
@@ -1017,7 +1070,7 @@ async function init() {
 
           const debugLabel = document.createElement('div');
           debugLabel.textContent = sec.key;
-          debugLabel.style.cssText = 'position:absolute;top:8px;left:12px;font-family:monospace;font-size:11px;color:rgba(180,100,255,0.85);z-index:999;pointer-events:none;';
+          debugLabel.style.cssText = 'position:absolute;top:8px;left:12px;font-family:monospace;font-size:11px;color:rgba(180,100,255,0.85);z-index:999;pointer-events:none;display:none;';
           section.style.position = 'relative';
           section.appendChild(debugLabel);
 
@@ -1046,6 +1099,9 @@ async function init() {
             exploreClose.setAttribute('aria-label', 'Exit explore mode');
             exploreClose.textContent = 'X';
             exploreFrame.appendChild(exploreClose);
+            const exploreHoverInfo = document.createElement('div');
+            exploreHoverInfo.className = 'explore-hover-info';
+            exploreFrame.appendChild(exploreHoverInfo);
             modelWindow.appendChild(exploreFrame);
 
             section.appendChild(modelWindow);
@@ -1055,6 +1111,20 @@ async function init() {
             body.innerHTML = content.body.map(p => `<p>${p}</p>`).join('');
             card.appendChild(body);
             mountPhaseViz(sec.key, card);
+
+            // Geopoint counter — injected for phases with known point counts.
+            const _gpCount = GEOPOINT_COUNTS[sec.key];
+            if (_gpCount > 0) {
+              const counterWrap = document.createElement('div');
+              counterWrap.className = 'geopoint-counter-wrap';
+              const countSpan = document.createElement('span');
+              countSpan.className = 'geopoint-count';
+              countSpan.dataset.target = String(_gpCount);
+              countSpan.textContent = '0';
+              counterWrap.appendChild(countSpan);
+              counterWrap.appendChild(document.createTextNode('\u00a0geopoints'));
+              card.appendChild(counterWrap);
+            }
 
             const textBlock = document.createElement('div');
             textBlock.className = 'narrative-text-block';
@@ -1067,6 +1137,47 @@ async function init() {
         });
 
         document.body.appendChild(page);
+
+        // ── Geopoint counter animation ────────────────────────────────────
+        {
+          function _animateGeoCounter(el, target) {
+            const duration = 1800;
+            const start = performance.now();
+            function step(now) {
+              const t = Math.min((now - start) / duration, 1);
+              const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+              el.textContent = Math.round(ease * target).toLocaleString();
+              if (t < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+          }
+          const _counterIO = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                const el = entry.target;
+                const target = parseInt(el.dataset.target, 10);
+                if (!isNaN(target)) {
+                  _animateGeoCounter(el, target);
+                  _counterIO.unobserve(el);
+                }
+              }
+            });
+          }, { threshold: 0.5 });
+          page.querySelectorAll('.geopoint-count').forEach(el => _counterIO.observe(el));
+        }
+
+        // ── Explore hover info ────────────────────────────────────────────
+        window.addEventListener('sprite-hover', (e) => {
+          if (!_exploreActive) return;
+          const infoEl = _activeExploreSection?.querySelector('.explore-hover-info');
+          if (!infoEl) return;
+          if (e.detail) {
+            infoEl.textContent = `# ${e.detail.index + 1} / ${e.detail.total}`;
+            infoEl.style.opacity = '1';
+          } else {
+            infoEl.style.opacity = '0';
+          }
+        });
 
         // ── Page footer (contact + credits — not a scroll phase) ──────────
         const narrativeFooter = document.createElement('footer');
@@ -1109,6 +1220,7 @@ async function init() {
 
         // ── Narrative Timeline ────────────────────────────────────────────
         const { dotWraps: _dotWraps } = mountNarrativeTimeline(page, SECTIONS);
+        const _timelineEl = document.querySelector('.narrative-timeline');
 
         // ── Explore Model sections (generalized) ──────────────────────────
 
@@ -1149,6 +1261,108 @@ async function init() {
           setControlsInteraction(true, true, true);
           setParallaxEnabled(false);
           section.classList.add('explore-mode-active');
+
+          // Hide the vertical timeline while explore is active.
+          if (_timelineEl) {
+            _timelineEl.style.transition = 'opacity 0.3s';
+            _timelineEl.style.opacity = '0';
+            _timelineEl.style.pointerEvents = 'none';
+          }
+
+          // Build explore legend inside the green frame.
+          {
+            const _expCfg = EXPLORE_OVERLAY_CONFIG[section.dataset.sectionKey];
+            const exploreFrame = section.querySelector('.explore-frame');
+            if (exploreFrame && _expCfg) {
+              const legendItems = [];
+
+              // Always-on overlays (CSO, NPDES, RCRA).
+              if (_expCfg.overlays) {
+                for (const [key, cfg] of Object.entries(CONFIG.csvFiles)) {
+                  const res = csvResults[key];
+                  if (!res) continue;
+                  legendItems.push({
+                    label: cfg.label,
+                    color: cfg.color,
+                    toggle: (v) => {
+                      res.group.visible = v;
+                      res.material.opacity = v ? 1 : 0;
+                      res.material.needsUpdate = true;
+                    },
+                  });
+                }
+              }
+
+              // Phase-specific point datasets.
+              for (let di = 0; di < phaseDatasetResults.length; di++) {
+                const ds = phaseDatasetResults[di];
+                if (!ds._showPoints) continue;
+                if (!ds._phases.some(p => _expCfg.datasetPhases.includes(p))) continue;
+                const cfgEntry = CONFIG.phaseDatasets[di];
+                legendItems.push({
+                  label: cfgEntry.label,
+                  color: cfgEntry.color,
+                  toggle: (v) => {
+                    ds.group.visible = v;
+                    ds.material.opacity = v ? 1 : 0;
+                    ds.material.needsUpdate = true;
+                  },
+                });
+              }
+
+              // Phase-specific polygon groups.
+              for (let pi = 0; pi < phasePolygonGroups.length; pi++) {
+                const pg = phasePolygonGroups[pi];
+                if (!pg._phases.some(p => _expCfg.polygonPhases.includes(p))) continue;
+                const cfgEntry = CONFIG.phasePolygons[pi];
+                const label = CONFIG.phaseDatasets.find(c => c.path === cfgEntry.path)?.label ?? 'Layer';
+                legendItems.push({
+                  label,
+                  color: cfgEntry.color,
+                  toggle: (v) => {
+                    pg.visible = v;
+                    if (pg._fillMaterial) {
+                      pg._fillMaterial.opacity = v ? pg._fillOpacity : 0;
+                      pg._fillMaterial.needsUpdate = true;
+                    }
+                    if (pg._lineMaterial) {
+                      pg._lineMaterial.opacity = v ? pg._lineOpacity : 0;
+                      pg._lineMaterial.needsUpdate = true;
+                    }
+                  },
+                });
+              }
+
+              const legend = document.createElement('div');
+              legend.className = 'explore-legend';
+              // Stop pointer events bubbling to the model-window forwarding handler,
+              // which calls e.preventDefault() and would suppress click events.
+              for (const evtType of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel']) {
+                legend.addEventListener(evtType, e => e.stopPropagation());
+              }
+              for (const item of legendItems) {
+                const colorHex = '#' + item.color.toString(16).padStart(6, '0');
+                const row = document.createElement('button');
+                row.className = 'explore-legend-item';
+                const dot = document.createElement('span');
+                dot.className = 'explore-legend-dot';
+                dot.style.background = colorHex;
+                const lbl = document.createElement('span');
+                lbl.className = 'explore-legend-label';
+                lbl.textContent = item.label;
+                row.appendChild(dot);
+                row.appendChild(lbl);
+                let active = true;
+                row.addEventListener('click', () => {
+                  active = !active;
+                  item.toggle(active);
+                  row.classList.toggle('explore-legend-item--off', !active);
+                });
+                legend.appendChild(row);
+              }
+              exploreFrame.appendChild(legend);
+            }
+          }
 
           // Show anchored labels only during explore mode.
           for (const label of sceneLabels) {
@@ -1288,6 +1502,17 @@ async function init() {
 
           setControlsInteraction(false, false, false);
           setParallaxEnabled(true);
+
+          // Restore the vertical timeline.
+          if (_timelineEl) {
+            _timelineEl.style.transition = 'opacity 0.3s';
+            _timelineEl.style.opacity = '';
+            _timelineEl.style.pointerEvents = '';
+          }
+
+          // Remove explore legend.
+          _activeExploreSection?.querySelector('.explore-legend')?.remove();
+
           _activeExploreSection?.classList.remove('explore-mode-active');
           if (_exploreForwardCleanup) { _exploreForwardCleanup(); _exploreForwardCleanup = null; }
 
@@ -1447,7 +1672,7 @@ async function init() {
             }
           }
 
-          const RIGHT_MODEL_KEYS = new Set(['phase-2-a', 'phase-2-b', 'phase-2-c', 'phase-3', 'phase-3-5']);
+          const RIGHT_MODEL_KEYS = new Set(['phase-2-a', 'phase-2-b', 'phase-2-c', 'phase-3', 'phase-3-5', 'phase-7', 'phase-7-5', 'phase-7-75']);
 
           if (activeIdx >= 0) {
             const sec = SECTIONS[activeIdx];
@@ -1482,9 +1707,14 @@ async function init() {
 
               const camera = getCamera();
               const scrubTarget = _modelCenter.clone().lerp(_fatbergCenter, ease);
-              const delta = scrubTarget.clone().sub(controls.target);
+
+              // Pan target toward sphere AND tilt camera to look more head-on,
+              // so the sphere reads as centered (not pushed toward top of screen).
+              // Lerp the camera offset from the home direction to the flattened
+              // goFatbergView angle over the same ease curve as the zoom.
+              const currentOffset = _homeOffset.clone().lerp(_fatbergFlatOffset, ease);
               controls.target.copy(scrubTarget);
-              camera.position.add(delta);
+              camera.position.copy(scrubTarget).add(currentOffset);
 
               const _nzVal = homeZoom * (CONFIG.camera.narrativeZoom ?? 0.92);
               const _fzVal = Math.min(homeZoom * _modelSphereRadius / _fatbergRadius * 0.22, controls.maxZoom);
