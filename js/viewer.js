@@ -139,7 +139,7 @@ export function createViewer() {
     const h = container.clientHeight;
     if (!w || !h) return;
     const a = w / h;
-    const scale = 1 + 0.12 * panelT;
+    const scale = 1 + 0.12 * Math.abs(panelT);
 
     if (camera.isOrthographicCamera) {
       const halfH = base * scale;
@@ -153,6 +153,7 @@ export function createViewer() {
         camera.left = -halfW;
         camera.right = halfW;
       } else {
+        // panelT > 0: shift model left (right-side panel), panelT < 0: shift model right (left-side panel)
         const P = PANEL_PX * panelT;
         const shift = P * halfW / w;
         camera.top = halfH;
@@ -162,10 +163,7 @@ export function createViewer() {
       }
     } else {
       camera.aspect = a;
-      // Provide basic aspect update, panel shifts not beautifully supported out-of-box for Persp yet
-      // but it looks OK if we ignore view-offset.  
-      if (w > 640 && panelT > 0) {
-        // Perspective shift using setViewOffset
+      if (w > 640 && panelT !== 0) {
         const pixelShift = PANEL_PX * panelT;
         camera.setViewOffset(w, h, -pixelShift / 2, 0, w, h);
       } else {
@@ -509,6 +507,27 @@ export function createViewer() {
     controls.enabled = false;
   }
 
+  // Like goFatbergView but pans the camera target to sphereCenter so the
+  // fatberg sphere is centred in the viewport (zoom is handled by caller).
+  function goFatbergSphereView(sphereCenter) {
+    const camera = activeCamera;
+    if (!homeState) return;
+    if (topDownAnim) topDownAnim.done = true;
+    const dist = homeState.pos.distanceTo(homeState.target);
+    const homeDir = homeState.pos.clone().sub(homeState.target).normalize();
+    const flatDir = new THREE.Vector3(homeDir.x, homeDir.y * 0.75, homeDir.z).normalize();
+    const endPos = sphereCenter.clone().addScaledVector(flatDir, dist);
+    const lookAtMatrix = new THREE.Matrix4().lookAt(endPos, sphereCenter, new THREE.Vector3(0, 1, 0));
+    const endQuat = new THREE.Quaternion().setFromRotationMatrix(lookAtMatrix);
+    topDownAnim = {
+      startPos: camera.position.clone(), endPos,
+      startQuat: camera.quaternion.clone(), endQuat,
+      target: sphereCenter.clone(),
+      t0: performance.now(), duration: 900, done: false
+    };
+    controls.enabled = false;
+  }
+
   // theta ≈ 0.001 rad (0.06°) — visually indistinguishable from straight down,
   // but avoids the gimbal singularity that breaks lookAt / OrbitControls at theta = 0.
   const TOPDOWN_THETA = 0.001;
@@ -572,6 +591,11 @@ export function createViewer() {
     panelTarget = enable ? 1 : 0;
   }
 
+  // Shift model to the right half of the screen (panelT → -1).
+  function setRightShift(enable) {
+    panelTarget = enable ? -1 : 0;
+  }
+
   // Instantly zero the frustum shift with no animation — call before goTopDown
   // so panelAnim never runs concurrently with the camera transition.
   function snapPanelShift() {
@@ -583,5 +607,12 @@ export function createViewer() {
 
   function setParallaxEnabled(enabled) { _parallaxEnabled = enabled; }
 
-  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, snapToTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift, setParallaxEnabled };
+  function cancelTopDownAnim() {
+    if (topDownAnim && !topDownAnim.done) {
+      topDownAnim.done = true;
+      controls.enabled = true;
+    }
+  }
+
+  return { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goFatbergSphereView, goDissectedTopDown, snapToTopDown, enableDissectedTilt, setNarrativeScrollHandler, getTiltInfo, setTiltTarget, setControlsInteraction, setAnimOnComplete, setModelSphere, setPanelShift, snapPanelShift, setRightShift, setParallaxEnabled, cancelTopDownAnim };
 }

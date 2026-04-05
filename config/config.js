@@ -18,7 +18,7 @@ const CONFIG = {
   csvFiles: {
     cso:              { path: './data/cso_2263_clipped.csv',    color: 0x00FFFF, darkColor: 0xFF0000, label: 'CSO'   },
     npdes:            { path: './data/npdes_2263_clipped.csv',  color: 0xFF3800, darkColor: 0x00FF00, label: 'NPDES' },
-    rcra_2263_clipped:{ path: './data/rcra_2263_clipped.csv',   color: 0x515B28, darkColor: 0xB1C074, label: 'RCRA'  },
+    rcra_2263_clipped:{ path: './data/rcra_2263_clipped.csv',   color: 0xFFFF00, darkColor: 0xFFFF00, label: 'RCRA'  },
   },
 
   // Phase-specific datasets — each only shown on the listed phase numbers.
@@ -40,7 +40,7 @@ const CONFIG = {
   ],
 
   marker: {
-    screenSize: 0.005, // size of point sprites in screen space (independent of zoom)
+    screenSize: 0.003, // size of point sprites in screen space (independent of zoom)
     worldSize: 80,
     heightOffset: 25 //125 z-height of the data sets
   },

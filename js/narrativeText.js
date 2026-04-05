@@ -58,12 +58,8 @@ export const NARRATIVE_CONTENT = {
   'phase-4': {
     heading: 'Visualizing Fatbergs',
     body: [
-      `Lorem ipsum dolor sit amet, consectetur adipiscing elit. At vero eos et
-       accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium
-       voluptatum deleniti atque corrupti quos dolores.`,
-      `Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil
-       impedit quo minus id quod maxime placeat facere possimus, omnis voluptas
-       assumenda est, omnis dolor repellendus.`,
+      `The sphere above represents the fatberg-forming mass that enters Newtown Creek each year. Applying a 1% solid-to-liquid ratio to the waterway's 1.456 billion gallons of annual Combined Sewer Overflow discharge — fats, oils, grease, and non-biodegradable solids — yields a sphere 155 feet in diameter: roughly 14.56 million gallons, weighing an estimated 60,000 tons, equivalent to a 15-story building or 22 Olympic swimming pools.`,
+      `Grease and "unflushables" cause 90% of all sewer blockages in New York City, costing the NYC DEP approximately $19 million annually in clearing and repairs. The Newtown Creek Wastewater Treatment Plant — the city's largest, with a dry-weather capacity of 310 million gallons per day — still sees over 1.4 billion gallons of contaminated water bypass the system every year during rain events.`,
     ],
   },
 

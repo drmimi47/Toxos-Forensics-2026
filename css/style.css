@@ -116,18 +116,21 @@ body {
   position: absolute;
   inset: 0;
   width: 50px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    #a7ce08 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      #a7ce08 50%,
+      transparent 100%);
   animation: bar-shimmer 1.5s ease-in infinite;
 }
 
 @keyframes bar-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(400%);
+  }
 }
 
 .preloader-text {
@@ -668,6 +671,7 @@ body.narrative-scroll-mode #viewer-container {
   z-index: 3;
 }
 
+
 /* Hide dissected side panels — text lives in the scroll page instead */
 body.narrative-scroll-mode .diss-svg,
 body.narrative-scroll-mode .diss-panels--right,
@@ -690,6 +694,18 @@ body.narrative-scroll-mode .diss-panels--left {
   justify-content: center;
 }
 
+/* Text centered in left half for sections where the model is shifted right */
+[data-section-key="phase-2-a"] .narrative-text-block,
+[data-section-key="phase-2-b"] .narrative-text-block,
+[data-section-key="phase-2-c"] .narrative-text-block,
+[data-section-key="phase-3"] .narrative-text-block,
+[data-section-key="phase-3-5"] .narrative-text-block {
+  position: absolute;
+  left: 0;
+  width: 50%;
+  padding-left: 0;
+}
+
 /* Model window is a full-coverage background layer — canvas shows through from behind */
 .narrative-model-window {
   position: absolute;
@@ -704,10 +720,28 @@ body.narrative-scroll-mode .diss-panels--left {
   justify-content: center;
 }
 
+[data-section-key="phase-1"] .narrative-text-card {
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 0px;
+  padding: 12px;
+}
+
 /* 1.5× heading size, centered */
-.narrative-scroll-section--intro .narrative-heading {
-  font-size: 1.875rem;
+.narrative-scroll-section--intro .narrative-text-card {
   text-align: center;
+   width: min(600px, 90vw);
+}
+
+.narrative-scroll-section--intro .narrative-heading {
+  font-size: 16px;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: #000000;
+  display: inline;
+  background-color: #a7ce08;
+  
 }
 
 
@@ -747,7 +781,7 @@ body.narrative-scroll-mode .diss-panels--left {
 
 /* Glass card — same aesthetic as .narrative-panel */
 .narrative-text-card {
-  width: min(600px, 80vw);
+  width: min(400px, 80vw);
   background: transparent;
   padding: 24px 0;
   text-align: left;
@@ -758,6 +792,7 @@ body.narrative-scroll-mode .diss-panels--left {
   .narrative-text-block {
     padding: 24px 16px;
   }
+
   .narrative-text-card {
     padding: 20px 20px;
   }
@@ -770,28 +805,29 @@ body.narrative-scroll-mode .diss-panels--left {
   transform: translateY(6px);
 }
 
+
+
+.narrative-body,
 .narrative-heading {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 1.25rem;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  color: var(--text);
-  margin: 0 0 20px;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.narrative-body {
-  transition: opacity 0.18s ease, transform 0.18s ease;
+.narrative-body,
+.narrative-heading {
+
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.narrative-heading {
+  margin: 0 0 16px;
 }
 
 .narrative-body p {
-  font-family: var(--font-sans);
-  font-weight: 300;
-  font-size: 1rem;
-  line-height: 1.8;
-  color: var(--text-dim);
-  margin: 0 0 16px;
+  margin: 0 0 12px;
 }
 
 .narrative-body p:last-child {
@@ -811,16 +847,19 @@ body.narrative-scroll-mode .diss-panels--left {
   text-underline-offset: 8px;
   transition: text-decoration-color 0.2s;
 }
+
 .explore-model-trigger:hover,
 .explore-model-trigger:focus-visible {
   text-decoration-color: #a7ce08;
   outline: none;
 }
+
 .explore-mode-active .explore-model-trigger {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
 }
+
 .explore-mode-active .narrative-model-window {
   cursor: default;
 }
@@ -838,9 +877,11 @@ body.narrative-scroll-mode .diss-panels--left {
   transition: opacity 0.3s;
   z-index: 55;
 }
+
 .explore-mode-active .explore-frame {
   opacity: 1;
 }
+
 .explore-frame-close {
   position: absolute;
   top: 0;
@@ -860,6 +901,7 @@ body.narrative-scroll-mode .diss-panels--left {
   opacity: 0;
   transition: opacity 0.2s;
 }
+
 .explore-mode-active .explore-frame-close {
   opacity: 1;
   pointer-events: auto;

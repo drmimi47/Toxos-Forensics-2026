@@ -152,7 +152,7 @@ async function init() {
 
   const initialVisuals = { bg: '#111111', darkUI: true, mdT: 0, labelColor: '#ffffff', labelOpacity: 0.75 };
 
-  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere, setParallaxEnabled } = createViewer();
+  const { scene, getCamera, setCameraMode, renderer, controls, setTickSprites, setHomeState, goHome, goDissectedView, goFatbergView, goDissectedTopDown, enableDissectedTilt, getTiltInfo, setTiltTarget, setControlsInteraction, setNarrativeScrollHandler, setModelSphere, setRightShift, setParallaxEnabled, cancelTopDownAnim } = createViewer();
 
   renderer.domElement.addEventListener('wheel', (e) => {
     // Non-narrative wheel events are handled by viewer controls directly.
@@ -178,12 +178,38 @@ async function init() {
 
     const modelBox = new THREE.Box3().setFromObject(model);
     frameBoundingBox(model, getCamera(), controls);
+    let _modelSphereRadius = 0;
     {
       const _box = new THREE.Box3().setFromObject(model);
       const _sphere = new THREE.Sphere();
       _box.getBoundingSphere(_sphere);
+      _modelSphereRadius = _sphere.radius;
       setModelSphere(_sphere.radius, CONFIG.camera.initialZoom ?? 0.80);
     }
+    // Fatberg sphere — 155ft diameter scaled to scene units (metres)
+    const _fatbergRadius = (155 / 2) * CONFIG.feetToMeters; // ≈ 23.6 m
+    const _fatbergCenter = new THREE.Vector3();
+    const _modelCenter = new THREE.Vector3();
+    modelBox.getCenter(_fatbergCenter);
+    modelBox.getCenter(_modelCenter);
+    _fatbergCenter.y = modelBox.max.y + _fatbergRadius + 20;
+    const fatbergMat = new THREE.MeshStandardMaterial({
+      color: 0xb8860b,
+      emissive: 0x3a2800,
+      transparent: true,
+      opacity: 0,
+      roughness: 0.75,
+      metalness: 0.05,
+      depthWrite: false,
+    });
+    const fatbergSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(_fatbergRadius, 48, 32),
+      fatbergMat
+    );
+    fatbergSphere.position.copy(_fatbergCenter);
+    fatbergSphere.visible = false;
+    scene.add(fatbergSphere);
+
     setHomeState(getCamera().position, controls.target);
     goDissectedTopDown(); // run top-down animation during load so it's done before preloader fades
     const homeZoom = getCamera().zoom;
@@ -832,6 +858,26 @@ async function init() {
           }));
         }
 
+        // Fatberg sphere: fade in on phase 4, fade out when leaving phase 4.
+        if (phase === 4) {
+          fatbergSphere.visible = true;
+          const t0 = performance.now();
+          (function tick() {
+            const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+            fatbergMat.opacity = p * 0.85;
+            if (p < 1) requestAnimationFrame(tick);
+          })();
+        } else if (prevPhase === 4) {
+          const startOp = fatbergMat.opacity;
+          const t0 = performance.now();
+          (function tick() {
+            const p = Math.min((performance.now() - t0) / FADE_MS, 1);
+            fatbergMat.opacity = startOp * (1 - p);
+            if (p < 1) requestAnimationFrame(tick);
+            else fatbergSphere.visible = false;
+          })();
+        }
+
         // Phase-specific datasets: fade in/out matching the overlay FADE_MS timing.
         // Datasets with showPoints:false skip point rendering (polygon fill/outline used instead).
         for (const ds of phaseDatasetResults) {
@@ -904,11 +950,18 @@ async function init() {
         if (phase === 0) goDissectedTopDown(); // title: top-down view
         if (phase === 1) goHome();             // blank model: animate to home pose
 
+        // Leaving fatberg phase: restore home camera so phase 5+ starts clean.
+        if (prevPhase === 4) {
+          goHome();
+        }
+
         // Zoom in on explore-model interstitials, zoom back out when leaving.
         const _nz = homeZoom * (CONFIG.camera.narrativeZoom ?? 0.92);
         if (phase === 5 || phase === 8) {
           setZoom(homeZoom * (CONFIG.camera.exploreZoom ?? 1.25));
         } else if (prevPhase === 5 || prevPhase === 8) {
+          setZoom(_nz);
+        } else if (prevPhase === 4 && phase !== 4) {
           setZoom(_nz);
         }
       }
@@ -1394,11 +1447,14 @@ async function init() {
             }
           }
 
+          const RIGHT_MODEL_KEYS = new Set(['phase-2-a', 'phase-2-b', 'phase-2-c', 'phase-3', 'phase-3-5']);
+
           if (activeIdx >= 0) {
             const sec = SECTIONS[activeIdx];
             _applyPhase(sec.phase);
             if (sec.subPhase >= 0) _applyDissectedSubPhase(sec.subPhase);
             if (_exploreActive && _activeExploreSection?.dataset.sectionKey !== sec.key) deactivateExplore();
+            setRightShift(RIGHT_MODEL_KEYS.has(sec.key));
           }
 
           _dotWraps.forEach((w, i) => w.classList.toggle('active', i === activeIdx));
@@ -1409,6 +1465,32 @@ async function init() {
               g.position.y = liftT * (i + 1) * 700;
               targetY[i]   = g.position.y;
             });
+          }
+
+          // Fatberg scrub: scroll-driven pan + zoom into sphere across phase-4.
+          if (P4_IDX >= 0 && winTops.length > P4_IDX) {
+            const scrubStart  = winTops[P4_IDX];
+            const scrubHeight = vh * 0.75;
+            const rawT = (scrollY - scrubStart) / scrubHeight;
+            const fatbergT = Math.max(0, Math.min(1, rawT));
+            // smoothstep
+            const ease = fatbergT * fatbergT * (3 - 2 * fatbergT);
+
+            if (currentPhase === 4 && fatbergT > 0) {
+              cancelTopDownAnim();
+              stopZoomTween(false);
+
+              const camera = getCamera();
+              const scrubTarget = _modelCenter.clone().lerp(_fatbergCenter, ease);
+              const delta = scrubTarget.clone().sub(controls.target);
+              controls.target.copy(scrubTarget);
+              camera.position.add(delta);
+
+              const _nzVal = homeZoom * (CONFIG.camera.narrativeZoom ?? 0.92);
+              const _fzVal = Math.min(homeZoom * _modelSphereRadius / _fatbergRadius * 0.22, controls.maxZoom);
+              camera.zoom = _nzVal + (_fzVal - _nzVal) * ease;
+              camera.updateProjectionMatrix();
+            }
           }
 
           // Tilt: map overall scroll progress to camera angle.
