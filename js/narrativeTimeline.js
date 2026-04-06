@@ -1,37 +1,28 @@
 // ── Narrative Timeline ────────────────────────────────────────────────────
-// Builds the fixed left-side dot navigation for the scroll narrative.
+// Builds the fixed left-side progress bar for the scroll narrative.
 //
 // Usage:
-//   const { dotWraps } = mountNarrativeTimeline(page, SECTIONS);
+//   const { dotWraps, setProgress } = mountNarrativeTimeline(page, SECTIONS);
 //   // In scroll handler:
 //   dotWraps.forEach((w, i) => w.classList.toggle('active', i === activeIdx));
-
-const PHASE_LABELS = [
-  'TOXICITY',      // phase-0: title
-  'CONTEXT',       // phase-1: context
-  'CSO',           // phase-2-a: combined sewer overflow
-  'NPDES',         // phase-2-b: water discharge permits
-  'RCRA',          // phase-2-c: hazardous waste facilities
-  'SLR',           // phase-3: sea level rise 100-year floodplain
-  'HEALTH',        // phase-3-5: neighborhood health indoor complaints
-  'FATBERG',       // phase-4: fatberg
-  'EXPLORE',       // phase-5: explore model
-  'REMEDIATION',   // phase-6: remediation title
-  'DETOXIFICATION',// phase-7: remediation body
-  'BOA',           // phase-7-5: brownfield opportunity areas
-  'GREENSTREETS',  // phase-7-75: NYC's Greenstreets program
-  'EXPLORE',       // phase-8: explore model
-];
+//   setProgress(activeIdx);
 
 /**
  * @param {HTMLElement} page     - The narrative scroll page element
  * @param {Array}       sections - The SECTIONS array from _startScrollNarrative
- * @returns {{ dotWraps: HTMLElement[] }}
+ * @returns {{ dotWraps: HTMLElement[], setProgress: (idx: number) => void }}
  */
 export function mountNarrativeTimeline(page, sections) {
   const timeline = document.createElement('nav');
   timeline.className = 'narrative-timeline';
   timeline.setAttribute('aria-label', 'Section navigation');
+
+  const track = document.createElement('div');
+  track.className = 'timeline-track';
+
+  const fill = document.createElement('div');
+  fill.className = 'timeline-fill';
+  track.appendChild(fill);
 
   const sectionEls = Array.from(page.querySelectorAll('.narrative-scroll-section'));
 
@@ -40,17 +31,7 @@ export function mountNarrativeTimeline(page, sections) {
     wrap.className = 'timeline-dot-wrap';
     wrap.setAttribute('role', 'button');
     wrap.setAttribute('tabindex', '0');
-    wrap.setAttribute('aria-label', PHASE_LABELS[i] ?? sec.key);
-
-    const dot = document.createElement('div');
-    dot.className = 'timeline-dot';
-
-    const label = document.createElement('span');
-    label.className = 'timeline-label';
-    label.textContent = PHASE_LABELS[i] ?? sec.key.toUpperCase();
-
-    wrap.appendChild(dot);
-    wrap.appendChild(label);
+    wrap.setAttribute('aria-label', sec.key);
 
     const target = sectionEls[i];
     wrap.addEventListener('click', () => {
@@ -63,11 +44,17 @@ export function mountNarrativeTimeline(page, sections) {
       }
     });
 
-    timeline.appendChild(wrap);
+    track.appendChild(wrap);
     return wrap;
   });
 
+  timeline.appendChild(track);
   document.body.appendChild(timeline);
 
-  return { dotWraps };
+  function setProgress(activeIdx) {
+    const pct = sections.length > 1 ? activeIdx / (sections.length - 1) : 0;
+    fill.style.height = `${pct * 100}%`;
+  }
+
+  return { dotWraps, setProgress };
 }

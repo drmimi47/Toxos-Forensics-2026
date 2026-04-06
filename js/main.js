@@ -877,7 +877,7 @@ async function init() {
 
         // Model opacity: fade to 25% on phase 10 (phase-7.75) so polygon data
         // is visible through the terrain, restore to full when leaving.
-        const MODEL_DIM_OPACITY = 0.25;
+        const MODEL_DIM_OPACITY = 0.1;
         if (phase === 10) {
           let startOp = 1;
           const t0 = performance.now();
@@ -1198,9 +1198,8 @@ async function init() {
                   <span class="credits-name">Patrick Rodriguez</span>
                   <span class="credits-name">Claire Galla</span>
                   <span class="credits-name">Samantha Nowak</span>
-                  <span class="credits-label">King</span>
-                  <span class="credits-name">Benny Yang</span>
                   <span class="credits-label">Contributors</span>
+                  <span class="credits-name">Benny Yang</span>
                   <span class="credits-name">Cole Chroman</span>
                   <span class="credits-name">Xiaodian Yi</span>
                   <span class="credits-label">Advisors</span>
@@ -1219,7 +1218,7 @@ async function init() {
         document.body.appendChild(narrativeFooter);
 
         // ── Narrative Timeline ────────────────────────────────────────────
-        const { dotWraps: _dotWraps } = mountNarrativeTimeline(page, SECTIONS);
+        const { dotWraps: _dotWraps, setProgress: _setProgress } = mountNarrativeTimeline(page, SECTIONS);
         const _timelineEl = document.querySelector('.narrative-timeline');
 
         // ── Explore Model sections (generalized) ──────────────────────────
@@ -1683,6 +1682,7 @@ async function init() {
           }
 
           _dotWraps.forEach((w, i) => w.classList.toggle('active', i === activeIdx));
+          _setProgress(activeIdx);
 
           if (inLiftZone) {
             if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
