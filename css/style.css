@@ -9,7 +9,6 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  cursor: none;
 }
 
 html {
@@ -1444,36 +1443,6 @@ body.dark .timeline-fill {
   margin: 0;
 }
 
-.snap-cursor {
-  position: fixed;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  z-index: 10000;
-  display: none;
-  color: var(--label);
-}
-
-.snap-cursor::before,
-.snap-cursor::after {
-  content: '';
-  position: absolute;
-  background: currentColor;
-}
-
-.snap-cursor::before {
-  width: 1px;
-  height: 14px;
-  left: -0.5px;
-  top: -7px;
-}
-
-.snap-cursor::after {
-  width: 14px;
-  height: 1px;
-  left: -7px;
-  top: -0.5px;
-}
 
 /* !important intentional — must override component/inline filters applied before image loads */
 .img-loading {

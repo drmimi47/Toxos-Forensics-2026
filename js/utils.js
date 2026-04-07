@@ -45,16 +45,8 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
   let _crossTarget = 0;
   const CROSS_OPACITY = 1;
 
-  const _snapCursor = document.createElement('div');
-  _snapCursor.id = 'snap-cursor';
-  _snapCursor.classList.add('snap-cursor');
-  document.body.appendChild(_snapCursor);
   const _tmpVec3 = new THREE.Vector3();
   const SNAP_RADIUS = 60;
-  let _snapX = null;
-  let _snapY = null;
-  let _clickSnapX = null;
-  let _clickSnapY = null;
 
   // Per-sprite selection highlight: clone the shared material so only the selected sprite is bright
   let _selClone = null;
@@ -242,26 +234,11 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
       if (!selectedSprite && activeType !== null) resetAllGroups();
       tooltipEl.classList.add('hidden');
       _crossTarget = 0;
-      _snapCursor.style.display = 'none'; _snapX = null; _snapY = null;
       return;
     }
 
-    const _snap = getDissected?.() ? findSnapSprite(event.clientX, event.clientY, canvasRect) : null;
-    if (_snap) {
-      _snapX = _snap.px; _snapY = _snap.py;
-      _snapCursor.style.display = 'block';
-      _snapCursor.style.left = `${_snapX}px`;
-      _snapCursor.style.top = `${_snapY}px`;
-      if (viewerCanvas) viewerCanvas.style.cursor = 'none';
-    } else {
-      _snapX = null; _snapY = null;
-      _snapCursor.style.display = 'none';
-    }
-
-    const effX = _snapX ?? event.clientX;
-    const effY = _snapY ?? event.clientY;
-    pointer.x = ((effX - canvasRect.left) / canvasRect.width) * 2 - 1;
-    pointer.y = -((effY - canvasRect.top) / canvasRect.height) * 2 + 1;
+    pointer.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
+    pointer.y = -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
 
     const camera = typeof getCamera === 'function' ? getCamera() : getCamera;
     raycaster.setFromCamera(pointer, camera);
@@ -326,14 +303,10 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
     _pointerIsDown = true;
     pointerDownPos.x = e.clientX;
     pointerDownPos.y = e.clientY;
-    _clickSnapX = _snapX; _clickSnapY = _snapY;
     tooltipEl.classList.add('hidden');
-    _snapCursor.style.display = 'none';
   });
   window.addEventListener('pointercancel', () => {
     _pointerIsDown = false;
-    _snapCursor.style.display = 'none';
-    _snapX = null; _snapY = null;
   });
 
   window.addEventListener('pointerup', (e) => {
@@ -372,8 +345,8 @@ export function setupTooltips(getCamera, scene, tooltipEl, modelBox, getDissecte
 
     if (e.clientX > clickRect.right) return;
 
-    const cx = _clickSnapX ?? e.clientX;
-    const cy = _clickSnapY ?? e.clientY;
+    const cx = e.clientX;
+    const cy = e.clientY;
     const clickPtr = new THREE.Vector2(
       ((cx - clickRect.left) / clickRect.width) * 2 - 1,
       -((cy - clickRect.top) / clickRect.height) * 2 + 1
