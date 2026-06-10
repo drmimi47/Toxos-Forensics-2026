@@ -15,6 +15,14 @@
   <link
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600;700&family=Geist+Mono:wght@400;500&display=swap"
     rel="stylesheet">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.172.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.172.0/examples/jsm/"
+      }
+    }
+  </script>
   <link rel="stylesheet" href="./css/color.css" />
   <link rel="stylesheet" href="./css/style.css" />
   <link rel="stylesheet" href="./css/threejs.css" />
@@ -117,15 +125,28 @@
 
   <!-- Last commit date -->
   <script>
-    fetch('./lastUpdated.json').then(r => r.json()).then(({ date }) => {
-      const d = new Date(date);
-      const mon = d.toLocaleString('en-US', { month: 'long' });
-      const day = d.getDate();
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      const el = document.getElementById('last-updated');
-      if (el) el.textContent = `Last Updated ${mon} ${day} ${hh}:${mm}`;
-    }).catch(() => { });
+    (async () => {
+      const sources = ['./lastUpdated.json', './public/lastUpdated.json'];
+
+      for (const source of sources) {
+        try {
+          const response = await fetch(source, { cache: 'no-store' });
+          if (!response.ok) continue;
+
+          const { date } = await response.json();
+          const d = new Date(date);
+          const mon = d.toLocaleString('en-US', { month: 'long' });
+          const day = d.getDate();
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          const el = document.getElementById('last-updated');
+          if (el) el.textContent = `Last Updated ${mon} ${day} ${hh}:${mm}`;
+          return;
+        } catch {
+          // Try the next known location.
+        }
+      }
+    })();
   </script>
 
   <!-- Entry point -->
